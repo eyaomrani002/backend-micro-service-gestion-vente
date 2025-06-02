@@ -1,0 +1,40 @@
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: client-service
+          uri: http://localhost:8081/
+          predicates:
+            - Path=/CLIENT-SERVICE/**
+          filters:
+            - StripPrefix=1
+        - id: produit-service
+          uri: http://localhost:8082/
+          predicates:
+            - Path=/PRODUIT-SERVICE/**
+          filters:
+            - StripPrefix=1
+        - id: facture-service
+          uri: http://localhost:8083/
+          predicates:
+            - Path=/FACTURE-SERVICE/**
+          filters:
+            - StripPrefix=1
+        - id: reglement-service
+          uri: http://localhost:8084/
+          predicates:
+            - Path=/REGLEMENT-SERVICE/**
+          filters:
+            - StripPrefix=1
+        - id: devise-service
+          uri: http://localhost:8085/
+          predicates:
+            - Path=/DEVISE-SERVICE/**
+          filters:
+            - StripPrefix=1
+        - id: auth-service
+          uri: http://localhost:8089/
+          predicates:
+            - Path=/AUTHENTIFICATIONSERVICE/**
+          filters:
+            - StripPrefix=1

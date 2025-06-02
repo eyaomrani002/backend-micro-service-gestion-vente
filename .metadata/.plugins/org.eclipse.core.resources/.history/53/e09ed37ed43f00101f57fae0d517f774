@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: gatewayservice
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true # Ensure this is true if using service discovery with Eureka
+          lower-case-service-id: true
+      globalcors:
+        add-to-simple-url-handler-mapping: true # Important for ensuring CORS filter applies
+        corsConfigurations:
+          '[/**]': # This applies CORS to all paths
+            allowedOrigins:
+              - "http://localhost:4200" # Your Angular app's origin
+            allowedMethods:
+              - "GET"
+              - "POST"
+              - "PUT"
+              - "DELETE"
+              - "OPTIONS" # OPTIONS method is crucial for preflight requests
+            allowedHeaders:
+              - "*" # Allows all headers, or you can list specific ones
+            allowCredentials: true
+            exposedHeaders: # Headers the browser is allowed to access
+              - "Content-Type"
+            maxAge: 3600 # How long the results of a preflight request can be cached (in seconds)
+  # Eureka client configuration (ensure your gateway can find other services)
+  eureka:
+    client:
+      serviceUrl:
+        defaultZone: http://localhost:8761/eureka/ # Adjust if your Eureka server is elsewhere
+      fetch-registry: true
+      register-with-eureka: true
+    instance:
+      prefer-ip-address: true
+
+server:
+  port: 8080 # Default gateway port

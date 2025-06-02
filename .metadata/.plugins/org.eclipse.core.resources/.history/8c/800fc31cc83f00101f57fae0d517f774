@@ -1,0 +1,23 @@
+package org.ms.facture_service.security;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Configuration
+public class JwtDecoderConfig {
+
+    private static final String SECRET_KEY = "MaClé";
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        SecretKeySpec secretKey = new SecretKeySpec(
+            SECRET_KEY.getBytes(StandardCharsets.UTF_8),
+            "HmacSHA256"
+        );
+        return NimbusJwtDecoder.withSecretKey(secretKey).build();
+    }
+}

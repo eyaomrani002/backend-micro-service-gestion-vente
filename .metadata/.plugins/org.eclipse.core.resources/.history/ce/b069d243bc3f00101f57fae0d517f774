@@ -1,0 +1,55 @@
+/*package org.ms.client_service.security;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+public class JwtAuthorizationFilter extends OncePerRequestFilter {
+    private static final String PREFIXE_JWT = "Bearer ";
+    private static final String CLE_SIGNATURE = "MaClé";
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        String authorizationToken = request.getHeader("Authorization");
+        if (authorizationToken != null && authorizationToken.startsWith(PREFIXE_JWT)) {
+            try {
+                String jwt = authorizationToken.substring(PREFIXE_JWT.length());
+                Algorithm algorithm = Algorithm.HMAC256(CLE_SIGNATURE);
+                JWTVerifier jwtVerifier = JWT.require(algorithm).build();
+                DecodedJWT decodedJWT = jwtVerifier.verify(jwt);
+                String username = decodedJWT.getSubject();
+                String[] roles = decodedJWT.getClaim("roles").asArray(String.class);
+                Collection<GrantedAuthority> authorities = new ArrayList<>();
+                for (String role : roles) {
+                    authorities.add(new SimpleGrantedAuthority(role));
+                }
+                // Store the JWT token in the credentials field
+                UsernamePasswordAuthenticationToken authenticationToken =
+                        new UsernamePasswordAuthenticationToken(username, jwt, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                filterChain.doFilter(request, response);
+            } catch (JWTVerificationException e) {
+                response.setHeader("error-message", e.getMessage());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid or expired JWT token");
+            }
+        } else {
+            filterChain.doFilter(request, response);
+        }
+    }
+}*/

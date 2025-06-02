@@ -1,0 +1,28 @@
+package org.ms.client_service.feign;
+
+import org.ms.client_service.model.Produit;
+import org.ms.client_service.security.FeignClientConfig;
+import org.springframework.cloud.openfeign.FallbackFactory;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@FeignClient(name = "PRODUIT-SERVICE", configuration = FeignClientConfig.class)
+public interface ProduitServiceClient {
+    @GetMapping("/produits/{id}")
+    Produit getProduitById(@PathVariable("id") Long id);
+}
+@Component
+class ProduitServiceClientFallbackFactory implements FallbackFactory<ProduitServiceClient> {
+    @Override
+    public ProduitServiceClient create(Throwable cause) {
+        return new ProduitServiceClient() {
+            @Override
+            public Produit getProduitById(Long id) {
+                System.err.println("Fallback triggered for getProduitById: " + cause.getMessage());
+                return new Produit(id, "Produit non disponible", 0.0, 0L, null, null);
+            }
+        };
+    }
+}

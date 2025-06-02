@@ -1,0 +1,292 @@
+package org.ms.produit_service.web;
+
+import org.ms.produit_service.entities.Categorie;
+import org.ms.produit_service.entities.Produit;
+import org.ms.produit_service.feign.FactureServiceClient;
+import org.ms.produit_service.repository.CategorieRepository;
+import org.ms.produit_service.repository.ProduitRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.hateoas.PagedModel;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+//@CrossOrigin(origins = "http://localhost:4200")
+@RefreshScope
+@RestController
+@RequestMapping("/produits")
+public class ProduitRestController {
+    private final ProduitRepository produitRepository;
+    private final CategorieRepository categorieRepository;
+    private final FactureServiceClient factureServiceClient;
+
+    @Value("${globalParam:0}")
+    private int globalParam;
+    @Value("${monParam:0}")
+    private int monParam;
+    @Value("${email:unknown}")
+    private String email;
+
+    public ProduitRestController(ProduitRepository produitRepository, CategorieRepository categorieRepository,
+                                 FactureServiceClient factureServiceClient) {
+        this.produitRepository = produitRepository;
+        this.categorieRepository = categorieRepository;
+        this.factureServiceClient = factureServiceClient;
+    }
+
+    // --- Product Endpoints ---
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('USER')")
+    public ResponseEntity<Map<String, Object>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<Produit> productPage = produitRepository.findAll(PageRequest.of(page, size));
+        List<Produit> produitsAvecCategories = productPage.getContent().stream()
+                .map(produit -> {
+                    if (produit.getCategorie() != null) {
+                        Categorie categorie = categorieRepository.findById(produit.getCategorie().getId()).orElse(null);
+                        produit.setCategorie(categorie);
+                    }
+                    return produit;
+                })
+                .collect(Collectors.toList());
+        Map<String, Object> response = Map.of(
+                "_embedded", Map.of("produits", produitsAvecCategories),
+                "page", Map.of(
+                        "size", productPage.getSize(),
+                        "totalElements", productPage.getTotalElements(),
+                        "totalPages", productPage.getTotalPages(),
+                        "number", productPage.getNumber()
+                )
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER')")
+    public Produit getOne(@PathVariable Long id) {
+        return produitRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Produit save(@Valid @RequestBody Produit produit) {
+        if (produit.getCategorie() != null && produit.getCategorie().getId() != null) {
+            categorieRepository.findById(produit.getCategorie().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Catégorie non trouvée"));
+        }
+        return produitRepository.save(produit);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Produit update(@PathVariable Long id, @Valid @RequestBody Produit produit) {
+        if (!produitRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id);
+        }
+        if (produit.getCategorie() != null && produit.getCategorie().getId() != null) {
+            categorieRepository.findById(produit.getCategorie().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Catégorie non trouvée"));
+        }
+        produit.setId(id);
+        return produitRepository.save(produit);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public void delete(@PathVariable Long id) {
+        if (!produitRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id);
+        }
+        produitRepository.deleteById(id);
+    }
+
+    @GetMapping("/rupture")
+    @PreAuthorize("hasAuthority('USER')")
+    public ResponseEntity<PagedModel<Produit>> getProduitsEnRupture(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<Produit> outOfStockProducts = produitRepository.findAll().stream()
+                .filter(p -> p.getQuantity() == 0)
+                .collect(Collectors.toList());
+        int start = Math.min(page * size, outOfStockProducts.size());
+        int end = Math.min(start + size, outOfStockProducts.size());
+        List<Produit> pagedProducts = outOfStockProducts.subList(start, end);
+        Page<Produit> productPage = new PageImpl<>(
+                pagedProducts,
+                PageRequest.of(page, size),
+                outOfStockProducts.size()
+        );
+        PagedModel<Produit> pagedModel = PagedModel.of(
+                productPage.getContent(),
+                new PagedModel.PageMetadata(
+                        productPage.getSize(),
+                        productPage.getNumber(),
+                        productPage.getTotalElements(),
+                        productPage.getTotalPages()
+                )
+        );
+        return ResponseEntity.ok(pagedModel);
+    }
+
+    @GetMapping("/top-vendus")
+    @PreAuthorize("hasAuthority('USER')")
+    public ResponseEntity<PagedModel<Produit>> getTopVendus(
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) Integer annee,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<Produit> produits = produitRepository.findAll();
+        Map<Long, Long> quantites = produits.stream()
+                .collect(Collectors.toMap(
+                        Produit::getId,
+                        p -> factureServiceClient.getQuantiteVendueByProduit(p.getId(), annee)
+                ));
+        List<Produit> sortedProduits = produits.stream()
+                .sorted((p1, p2) -> quantites.getOrDefault(p2.getId(), 0L).compareTo(quantites.getOrDefault(p1.getId(), 0L)))
+                .limit(limit)
+                .collect(Collectors.toList());
+        int start = Math.min(page * size, sortedProduits.size());
+        int end = Math.min(start + size, sortedProduits.size());
+        List<Produit> pagedProducts = sortedProduits.subList(start, end);
+        Page<Produit> productPage = new PageImpl<>(
+                pagedProducts,
+                PageRequest.of(page, size),
+                sortedProduits.size()
+        );
+        PagedModel<Produit> pagedModel = PagedModel.of(
+                productPage.getContent(),
+                new PagedModel.PageMetadata(
+                        productPage.getSize(),
+                        productPage.getNumber(),
+                        productPage.getTotalElements(),
+                        productPage.getTotalPages()
+                )
+        );
+        return ResponseEntity.ok(pagedModel);
+    }
+
+    // --- Category Endpoints ---
+
+    @GetMapping("/categories")
+    @PreAuthorize("hasAuthority('USER')")
+    public ResponseEntity<PagedModel<Categorie>> listCategories(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<Categorie> categoriePage = categorieRepository.findAll(PageRequest.of(page, size));
+        PagedModel<Categorie> pagedModel = PagedModel.of(
+                categoriePage.getContent(),
+                new PagedModel.PageMetadata(
+                        categoriePage.getSize(),
+                        categoriePage.getNumber(),
+                        categoriePage.getTotalElements(),
+                        categoriePage.getTotalPages()
+                )
+        );
+        return ResponseEntity.ok(pagedModel);
+    }
+
+    @GetMapping("/categories/{id}")
+    @PreAuthorize("hasAuthority('USER')")
+    public Categorie getCategorie(@PathVariable Long id) {
+        return categorieRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catégorie non trouvée pour l'ID : " + id));
+    }
+
+    @PostMapping("/categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Categorie saveCategorie(@Valid @RequestBody Categorie categorie) {
+        return categorieRepository.save(categorie);
+    }
+
+    @PutMapping("/categories/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Categorie updateCategorie(@PathVariable Long id, @Valid @RequestBody Categorie categorie) {
+        if (!categorieRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Catégorie non trouvée pour l'ID : " + id);
+        }
+        categorie.setId(id);
+        return categorieRepository.save(categorie);
+    }
+
+    @DeleteMapping("/categories/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public void deleteCategorie(@PathVariable Long id) {
+        if (!categorieRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Catégorie non trouvée pour l'ID : " + id);
+        }
+        if (produitRepository.existsByCategorieId(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de supprimer la catégorie : des produits sont associés");
+        }
+        categorieRepository.deleteById(id);
+    }
+
+    @GetMapping("/config")
+    @PreAuthorize("hasAuthority('USER')")
+    public Map<String, Object> config() {
+        return Map.of(
+                "globalParam", globalParam,
+                "monParam", monParam,
+                "email", email,
+                "threadName", Thread.currentThread().toString()
+        );
+    }
+
+    @GetMapping("/search/byName")
+    @PreAuthorize("hasAuthority('USER')")
+    public List<Produit> searchProduitsByName(@RequestParam String name) {
+        return produitRepository.findByNameContainingIgnoreCase(name);
+    }
+
+    @GetMapping("/categories/search/byName")
+    @PreAuthorize("hasAuthority('USER')")
+    public List<Categorie> searchCategoriesByName(@RequestParam String name) {
+        return categorieRepository.findByNameContainingIgnoreCase(name);
+    }
+//http://localhost:8082/produits/search/byName?name=HP
+	// GET http://localhost:8082/produits/search/byName?name=dell
+
+	@PutMapping("/{id}/decreaseStock")
+    public ResponseEntity<Produit> decreaseStock(@PathVariable Long id, @RequestParam int quantity) {
+        Produit produit = produitRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé"));
+
+        if (produit.getQuantity() < quantity) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantité en stock insuffisante");
+        }
+
+        produit.setQuantity(produit.getQuantity() - quantity);
+        Produit updatedProduit = produitRepository.save(produit);
+
+        // Vérifier seuil critique (exemple seuil = 5)
+        int seuilCritique = 5;
+        if (updatedProduit.getQuantity() <= seuilCritique) {
+            // Log de l’alerte
+            System.out.println("ALERTE : Stock critique pour le produit " + updatedProduit.getName() + ", quantité restante : " + updatedProduit.getQuantity());
+            // TODO : envoyer notification (email, message, event Kafka/RabbitMQ)
+        }
+
+        return ResponseEntity.ok(updatedProduit);
+    }
+//http://localhost:8082/produits/1/decreaseStock?quantity=5
+
+	
+
+}

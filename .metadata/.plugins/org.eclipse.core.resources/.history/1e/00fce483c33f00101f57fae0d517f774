@@ -1,0 +1,20 @@
+package org.ms.facture_service.config;
+
+import feign.RequestInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FeignClientConfig {
+
+    @Bean
+    public RequestInterceptor requestInterceptor() {
+        return requestTemplate -> {
+            // Ici, tu dois mettre le token JWT valide ou autre méthode d'authentification
+            String token = "ton_token_jwt_ici"; // à récupérer dynamiquement idéalement
+
+            requestTemplate.header("Authorization", "Bearer " + token);
+        };
+    }
+}
+

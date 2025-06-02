@@ -1,0 +1,5 @@
+package org.ms.facture_service.config;
+
+public class FeignClientConfig {
+
+}

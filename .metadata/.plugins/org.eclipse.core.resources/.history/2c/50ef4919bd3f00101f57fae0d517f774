@@ -1,0 +1,8 @@
+package org.ms.produit_service.security;
+
+public class Snippet {
+	public static void main(String[] args) {
+		eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyMiIsInJvbGVzIjpbIkFETUlOIiwiVVNFUiJdLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODkvYXV0aC9sb2dpbiIsImV4cCI6MTc0ODg3NDY4Mn0.G5zd-eAbYGQsa4mlMsKxXwEGlilqHYxmRaZ4ltXWctw
+	}
+}
+

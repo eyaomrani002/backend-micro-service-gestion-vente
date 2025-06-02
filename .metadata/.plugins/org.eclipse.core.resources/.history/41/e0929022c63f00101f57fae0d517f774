@@ -1,0 +1,27 @@
+package org.ms.facture_service.config;
+
+import feign.RequestInterceptor;
+import feign.RequestTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FeignClientConfig {
+
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Bean
+    public RequestInterceptor requestInterceptor() {
+        return new RequestInterceptor() {
+            @Override
+            public void apply(RequestTemplate template) {
+                // TODO: Générer ou récupérer un token JWT valide ici
+                // Pour l'exemple, on met un token statique (à remplacer)
+                String token = "Bearer ton_token_jwt_valide_ici";
+                template.header("Authorization", token);
+            }
+        };
+    }
+}

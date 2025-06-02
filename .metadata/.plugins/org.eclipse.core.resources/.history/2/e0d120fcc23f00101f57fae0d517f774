@@ -1,0 +1,6 @@
+spring.application.name=facture-service
+spring.cloud.config.uri=http://localhost:5555/
+spring.cloud.discovery.enabled=true
+logging.level.org.springframework=DEBUG
+logging.level.feign=DEBUG
+logging.level.com.netflix.discovery=DEBUG

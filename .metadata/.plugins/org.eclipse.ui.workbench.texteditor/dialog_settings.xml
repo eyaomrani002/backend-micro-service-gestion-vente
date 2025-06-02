@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<item key="hasShownOverlayPopupBefore" value="true"/>
+	<section name="java.lang.Class">
+		<item key="replaceBarOpen" value="false"/>
+		<list key="findhistory">
+			<item value="h2database"/>
+			<item value="eure"/>
+			<item value="Feign"/>
+			<item value="boots"/>
+			<item value="org.springframework.cloud"/>
+			<item value="bootst"/>
+			<item value="decreaseStock"/>
+			<item value="/ids"/>
+			<item value="IDS"/>
+			<item value="sum"/>
+			<item value="updateFactureStatus"/>
+			<item value="status"/>
+			<item value="validateReglement"/>
+			<item value="GetMapping"/>
+			<item value="actures/client/{clientId}"/>
+		</list>
+	</section>
+</section>

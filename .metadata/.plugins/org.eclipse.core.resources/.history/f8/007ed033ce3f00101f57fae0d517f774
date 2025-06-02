@@ -1,0 +1,29 @@
+package org.ms.facture_service.feign;
+
+import org.ms.facture_service.config.FeignClientConfig;
+import org.ms.facture_service.model.Client;
+import org.springframework.cloud.openfeign.FallbackFactory;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@FeignClient(name="CLIENT-SERVICE", configuration = FeignClientConfig.class)
+public interface ClientServiceClient {
+    @GetMapping("/clients/{id}")
+    Client findClientById(@PathVariable("id") Long id);
+}
+
+@Component
+class ClientServiceClientFallbackFactory implements FallbackFactory<ClientServiceClient> {
+    @Override
+    public ClientServiceClient create(Throwable cause) {
+        return new ClientServiceClient() {
+            @Override
+            public Client findClientById(Long id) {
+                System.err.println("Fallback triggered for findClientById: " + cause.getMessage());
+                return new Client(id, "Client indisponible", "N/A", "N/A");
+            }
+        };
+    }
+}

@@ -1,0 +1,16 @@
+package org.ms.produit_service.feign;
+
+import org.ms.produit_service.security.FeignClientConfig;
+//package org.ms.produit_service.feign;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+@FeignClient(name = "FACTURE-SERVICE", configuration = FeignClientConfig.class)
+public interface FactureServiceClient {
+ @GetMapping("/factures/lignes/produit/{produitId}/quantite")
+ Long getQuantiteVendueByProduit(@PathVariable("produitId") Long produitId, @RequestParam(required = false) Integer annee);
+}
