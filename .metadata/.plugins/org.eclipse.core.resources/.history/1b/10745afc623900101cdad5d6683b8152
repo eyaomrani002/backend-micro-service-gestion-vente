@@ -1,0 +1,72 @@
+package org.ms.facture_service.entities;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import org.ms.facture_service.model.Client;
+import jakarta.persistence.*;
+
+import java.util.Collection;
+import java.util.Date;
+import org.ms.facture_service.feign.ReglementServiceClient;
+
+@Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
+public class Facture {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Temporal(TemporalType.DATE)
+    private Date dateFacture;
+
+    private String status; // NON_PAYEE, PARTIELLEMENT_PAYEE, PAYEE
+
+    private Double total; // Computed from factureLignes
+
+    @OneToMany(mappedBy = "facture", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    private Collection<FactureLigne> factureLignes;
+
+    @Transient
+    private Client client;
+
+    @Column(name = "client_id")
+    private Long clientID;
+
+    public Facture(Date dateFacture, String status, Long clientID) {
+        this.dateFacture = dateFacture;
+        this.status = status;
+        this.clientID = clientID;
+        this.total = 0.0;
+    }
+
+    @PrePersist
+    @PreUpdate
+    public void computeTotal() {
+        if (factureLignes != null) {
+            this.total = factureLignes.stream()
+                    .mapToDouble(fl -> fl.getPrice() * fl.getQuantity())
+                    .sum();
+        } else {
+            this.total = 0.0;
+        }
+        if (this.status == null) {
+            this.status = "NON_PAYEE";
+        }
+    }
+
+    // Placeholder for getResteAPayer (requires reglement-service integration)
+    public Double getResteAPayer() {
+        try {
+            Double paidAmount = reglementServiceClient.sumByFactureId(this.id);
+            return total - (paidAmount != null ? paidAmount : 0.0);
+        } catch (Exception e) {
+            // Fallback to total if reglement-service is unavailable
+            return "PAYEE".equals(status) ? 0.0 : total;
+        }
+    }
+}

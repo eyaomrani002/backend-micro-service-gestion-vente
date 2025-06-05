@@ -1,0 +1,82 @@
+package org.ms.client_service.web;
+
+import org.ms.client_service.entities.Client;
+import org.ms.client_service.feign.FactureServiceClient;
+import org.ms.client_service.model.Facture;
+import org.ms.client_service.repository.ClientRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@RefreshScope
+@RestController
+@RequestMapping("/clients")
+public class ClientRestController {
+	@Autowired
+	private ClientRepository clientRepository;
+	@Autowired
+    private FactureServiceClient factureServiceClient;
+	
+	@GetMapping
+	public List<Client> list() {
+		return clientRepository.findAll();
+	}
+
+	@GetMapping(path = "/{id}")
+	public Client getOne(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    return clientRepository.findById(id).get();
+	}
+
+	@PostMapping
+	public Client save(@RequestBody Client client) {
+		return clientRepository.save(client);
+	}
+
+    @PutMapping(path = "/{id}")
+    public Client update(@PathVariable("id") Long id, @RequestBody Client client) { // <-- ("id")
+        client.setId(id);
+        return clientRepository.save(client);
+    }
+
+	@DeleteMapping(path = "/{id}")
+	public void delete(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    clientRepository.deleteById(id);
+	}
+	@GetMapping("/{id}/chiffre-affaires")
+    public Double getChiffreAffaires(@PathVariable Long id, @RequestParam(required = false) Integer annee) {
+        return factureServiceClient.getChiffreAffairesByClient(id, annee);
+    }
+
+    @GetMapping("/{id}/reste-a-payer")
+    public Double getResteAPayer(@PathVariable Long id) {
+        return factureServiceClient.getResteAPayerByClient(id);
+    }
+
+    @GetMapping("/{id}/factures")
+    public List<Facture> getFacturesByStatut(@PathVariable Long id, @RequestParam(required = false) String statut) {
+        return factureServiceClient.findFacturesByClientAndStatut(id, statut);
+    }
+
+    @GetMapping("/fideles")
+    public List<Client> getClientsFideles(@RequestParam(defaultValue = "5") int limit) {
+        List<Client> clients = clientRepository.findAll();
+        return clients.stream()
+                .sorted((c1, c2) -> {
+                    Double ca1 = factureServiceClient.getChiffreAffairesByClient(c1.getId(), null);
+                    Double ca2 = factureServiceClient.getChiffreAffairesByClient(c2.getId(), null);
+                    return ca2.compareTo(ca1); // Tri par CA décroissant
+                })
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    @GetMapping("/{id}/produits-sollicites")
+    public List<Map<String, Object>> getProduitsSollicites(@PathVariable Long id, @RequestParam(defaultValue = "5") int limit) {
+        // À implémenter avec facture-service et produit-service
+        // Récupérer les factures du client, puis les lignes de facture, et compter les produits
+        return List.of(); // Placeholder
+    }
+}

@@ -25,16 +25,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .cors().and()
-            .csrf().disable()
+            .cors(cors -> cors.disable()) // Désactive CORS (adapter si besoin)
+            .csrf(csrf -> csrf.disable()) // Désactive CSRF
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/factures/{id}").permitAll() // à adapter selon tes besoins
-                .requestMatchers("/factures/**").authenticated()
-	            .requestMatchers("/devises/**").authenticated()
-                .anyRequest().permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/factures/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/factures/**").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/factures/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/factures/**").permitAll()
+                .anyRequest().authenticated()
             )
             .addFilterBefore(new JwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();

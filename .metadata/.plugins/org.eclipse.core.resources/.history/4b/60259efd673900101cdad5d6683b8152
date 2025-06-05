@@ -1,0 +1,129 @@
+package org.ms.produit_service.web;
+
+import org.ms.produit_service.entities.Produit;
+import org.ms.produit_service.feign.FactureServiceClient;
+import org.ms.produit_service.repository.ProduitRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.Valid;
+
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.hateoas.PagedModel;
+import org.springframework.hateoas.PagedModel.PageMetadata;
+import org.springframework.http.ResponseEntity;
+@RefreshScope
+@RestController
+@RequestMapping("/produits")
+public class ProduitRestController {
+    private final ProduitRepository produitRepository;
+    private final FactureServiceClient factureServiceClient;
+    
+    
+    @Value("${globalParam}")
+    private int globalParam;
+    @Value("${monParam}")
+    private int monParam;
+    @Value("${email}")
+    private String email;
+
+    public ProduitRestController(ProduitRepository produitRepository ,FactureServiceClient factureServiceClient) {
+        this.produitRepository = produitRepository;
+		this.factureServiceClient = factureServiceClient;
+    }
+
+    // Lister tous les produits
+    @GetMapping
+    public ResponseEntity<PagedModel<Produit>> list(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size) {
+
+        Page<Produit> productPage = produitRepository.findAll(PageRequest.of(page, size));
+        
+        PagedModel<Produit> pagedModel = PagedModel.of(
+            productPage.getContent(),
+            new PageMetadata(
+                productPage.getSize(),
+                productPage.getNumber(),
+                productPage.getTotalElements(),
+                productPage.getTotalPages()
+            )
+        );
+
+        return ResponseEntity.ok(pagedModel);
+    }
+
+    // Récupérer un produit par ID
+    @GetMapping("/{id}")
+    public Produit getOne(@PathVariable Long id) {
+        return produitRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id));
+    }
+
+    // Ajouter un nouveau produit
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Produit save(@Valid @RequestBody Produit produit) {
+        return produitRepository.save(produit);
+    }
+    // Modifier un produit existant
+    @PutMapping("/{id}")
+    public Produit update(@PathVariable Long id,@RequestBody Produit produit) {
+        if (!produitRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id);
+        }
+        produit.setId(id);
+        return produitRepository.save(produit);
+    }
+    // Supprimer un produit
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        if (!produitRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id);
+        }
+        produitRepository.deleteById(id);
+    }
+
+    // Endpoint existant pour la configuration
+    @GetMapping("/config")
+    public Map<String, Object> config() {
+        Map<String, Object> params = new Hashtable<>();
+        params.put("globalParam", globalParam);
+        params.put("monParam", monParam);
+        params.put("email", email);
+        params.put("threadName", Thread.currentThread().toString());
+        return params;
+    }
+    
+    @GetMapping("/rupture")
+    public List<Produit> getProduitsEnRupture() {
+        return produitRepository.findAll().stream()
+            .filter(p -> p.getQuantity() == 0)
+            .collect(Collectors.toList());
+    }
+    @GetMapping("/top-vendus")
+    public List<Produit> getTopVendus(@RequestParam(defaultValue = "10") int limit, @RequestParam(required = false) Integer annee) {
+        List<Produit> produits = produitRepository.findAll();
+        Map<Long, Long> quantites = produits.stream()
+                .collect(Collectors.toMap(
+                        Produit::getId,
+                        p -> factureServiceClient.getQuantiteVendueByProduit(p.getId(), annee)
+                ));
+        return produits.stream()
+                .sorted((p1, p2) -> quantites.get(p2.getId()).compareTo(quantites.get(p1.getId())))
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+
+}

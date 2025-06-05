@@ -1,0 +1,5 @@
+package org.ms.facture_service.feign;
+
+public interface ReglementServiceClient {
+
+}

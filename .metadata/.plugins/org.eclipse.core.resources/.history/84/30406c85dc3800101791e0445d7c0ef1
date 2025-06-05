@@ -1,0 +1,91 @@
+package org.ms.client_service.web;
+
+import org.ms.client_service.entities.Client;
+import org.ms.client_service.feign.FactureServiceClient;
+import org.ms.client_service.model.Facture;
+import org.ms.client_service.model.Produit;
+import org.ms.client_service.repository.ClientRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import java.util.Map;
+
+@RefreshScope
+@RestController
+@RequestMapping("/clients")
+public class ClientRestController {
+	@Autowired
+	private ClientRepository clientRepository;
+    private final FactureServiceClient factureServiceClient;
+    
+    public ClientRestController(FactureServiceClient factureServiceClient) {
+        this.factureServiceClient = factureServiceClient;
+    }
+	@GetMapping
+	public List<Client> list() {
+		return clientRepository.findAll();
+	}
+
+	@GetMapping(path = "/{id}")
+	public Client getOne(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    return clientRepository.findById(id).get();
+	}
+
+	@PostMapping
+	public Client save(@RequestBody Client client) {
+		return clientRepository.save(client);
+	}
+
+    @PutMapping(path = "/{id}")
+    public Client update(@PathVariable("id") Long id, @RequestBody Client client) { // <-- ("id")
+        client.setId(id);
+        return clientRepository.save(client);
+    }
+
+	@DeleteMapping(path = "/{id}")
+	public void delete(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    clientRepository.deleteById(id);
+	}
+	
+	
+	
+	// Chiffre d'affaires global ou par année
+    @GetMapping("/{clientId}/chiffre-affaires")
+    public Double getChiffreAffaires(
+            @PathVariable Long clientId,
+            @RequestParam(required = false) Integer annee) {
+        return factureServiceClient.getChiffreAffaires(clientId, annee);
+    }
+
+    // Reste à payer
+    @GetMapping("/{clientId}/reste-a-payer")
+    public Double getResteAPayer(@PathVariable Long clientId) {
+        return factureServiceClient.getResteAPayer(clientId);
+    }
+
+    // Factures réglées
+    @GetMapping("/{clientId}/factures-reglees")
+    public List<Facture> getFacturesReglees(@PathVariable Long clientId) {
+        return factureServiceClient.getFacturesReglees(clientId);
+    }
+
+    // Factures non réglées
+    @GetMapping("/{clientId}/factures-non-reglees")
+    public List<Facture> getFacturesNonReglees(@PathVariable Long clientId) {
+        return factureServiceClient.getFacturesNonReglees(clientId);
+    }
+
+    // Produits les plus sollicités par client
+    @GetMapping("/{clientId}/produits-top")
+    public List<Produit> getProduitsTopParClient(@PathVariable Long clientId) {
+        return factureServiceClient.getProduitsTopParClient(clientId);
+    }
+
+    // Clients les plus fidèles (top N)
+    @GetMapping("/top-fideles")
+    public List<Map<String, Object>> getClientsFideles(
+            @RequestParam(defaultValue = "5") int limit) {
+        return factureServiceClient.getClientsFideles(limit);
+    }
+}

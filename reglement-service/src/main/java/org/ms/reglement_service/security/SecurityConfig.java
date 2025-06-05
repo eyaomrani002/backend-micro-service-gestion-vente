@@ -26,10 +26,13 @@ public class SecurityConfig {
 	        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 	        .authorizeHttpRequests(auth -> auth
 	            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-	            .requestMatchers("/reglements").permitAll() // <-- ajoute cette ligne
-	            .requestMatchers("/reglements/{id}").permitAll()
-	            .requestMatchers("/reglements/**").authenticated()
-	            .anyRequest().permitAll()
+	            .requestMatchers("/h2-console/**").permitAll()
+	            .requestMatchers("/api/auth/**").permitAll()
+	            .requestMatchers(HttpMethod.GET, "/reglements/**").permitAll()
+	            .requestMatchers(HttpMethod.POST, "/reglements/**").permitAll()
+	            .requestMatchers(HttpMethod.PUT, "/reglements/**").permitAll()
+	            .requestMatchers(HttpMethod.DELETE, "/reglements/**").permitAll()
+	            .anyRequest().authenticated()
 	        )
 	        .addFilterBefore(new JwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 	    return http.build();

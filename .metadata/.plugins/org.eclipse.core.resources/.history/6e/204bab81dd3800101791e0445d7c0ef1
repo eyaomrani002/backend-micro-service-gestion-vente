@@ -1,0 +1,41 @@
+package org.ms.client_service.feign;
+
+import org.ms.client_service.model.Facture;
+import org.ms.client_service.model.Produit;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+import java.util.Map;
+
+@FeignClient(name = "facture-service")
+public interface FactureServiceClient {
+
+    // Chiffre d'affaires global ou par année
+    @GetMapping("/factures/chiffre-affaires/{clientId}")
+    Double getChiffreAffaires(
+        @PathVariable("clientId") Long clientId,
+        @RequestParam(value = "annee", required = false) Integer annee);
+
+    // Reste à payer (total des factures non réglées)
+    @GetMapping("/factures/reste-a-payer/{clientId}")
+    Double getResteAPayer(@PathVariable("clientId") Long clientId);
+
+    // Factures réglées
+    @GetMapping("/factures/reglees/{clientId}")
+    List<Facture> getFacturesReglees(@PathVariable("clientId") Long clientId);
+
+    // Factures non réglées
+    @GetMapping("/factures/non-reglees/{clientId}")
+    List<Facture> getFacturesNonReglees(@PathVariable("clientId") Long clientId);
+
+    // Produits les plus sollicités par client
+    @GetMapping("/factures/produits-top/{clientId}")
+    List<Produit> getProduitsTopParClient(@PathVariable("clientId") Long clientId);
+
+    // Clients les plus fidèles (top N)
+    @GetMapping("/factures/clients-fideles")
+    List<Map<String, Object>> getClientsFideles(@RequestParam(value = "limit", defaultValue = "5") int limit);
+}

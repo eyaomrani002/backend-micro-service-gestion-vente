@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -47,6 +48,7 @@ public class ProduitRestController {
 	// --- Product Endpoints ---
 
 	@GetMapping
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public ResponseEntity<Map<String, Object>> list(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "10") int size) {
 
@@ -68,12 +70,14 @@ public class ProduitRestController {
 	}
 
 	@GetMapping("/{id}")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Produit getOne(@PathVariable Long id) {
 		return produitRepository.findById(id).orElseThrow(
 				() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id));
 	}
 
 	@PostMapping
+	@PreAuthorize("hasAuthority('ADMIN')")
 	@ResponseStatus(HttpStatus.CREATED)
 	public Produit save(@Valid @RequestBody Produit produit) {
 		if (produit.getCategorie() != null && produit.getCategorie().getId() != null) {
@@ -84,6 +88,7 @@ public class ProduitRestController {
 	}
 
 	@PutMapping("/{id}")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	public Produit update(@PathVariable Long id, @Valid @RequestBody Produit produit) {
 		if (!produitRepository.existsById(id)) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produit non trouvé pour l'ID : " + id);
@@ -97,6 +102,7 @@ public class ProduitRestController {
 	}
 
 	@DeleteMapping("/{id}")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {
 		if (!produitRepository.existsById(id)) {
@@ -144,6 +150,7 @@ public class ProduitRestController {
 	// --- Category Endpoints ---
 
 	@GetMapping("/categories")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public ResponseEntity<PagedModel<Categorie>> listCategories(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "10") int size) {
 		Page<Categorie> categoriePage = categorieRepository.findAll(PageRequest.of(page, size));
@@ -154,18 +161,21 @@ public class ProduitRestController {
 	}
 
 	@GetMapping("/categories/{id}")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Categorie getCategorie(@PathVariable Long id) {
 		return categorieRepository.findById(id).orElseThrow(
 				() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catégorie non trouvée pour l'ID : " + id));
 	}
 
 	@PostMapping("/categories")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	@ResponseStatus(HttpStatus.CREATED)
 	public Categorie saveCategorie(@Valid @RequestBody Categorie categorie) {
 		return categorieRepository.save(categorie);
 	}
 
 	@PutMapping("/categories/{id}")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	public Categorie updateCategorie(@PathVariable Long id, @Valid @RequestBody Categorie categorie) {
 		if (!categorieRepository.existsById(id)) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Catégorie non trouvée pour l'ID : " + id);
@@ -175,6 +185,7 @@ public class ProduitRestController {
 	}
 
 	@DeleteMapping("/categories/{id}")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteCategorie(@PathVariable Long id) {
 		if (!categorieRepository.existsById(id)) {

@@ -12,4 +12,7 @@ import java.util.List;
 public interface FactureLigneRepository extends JpaRepository<FactureLigne, Long> {
     @Query("SELECT fl.produitID, SUM(fl.quantity) as quantite FROM FactureLigne fl WHERE fl.facture.clientID = :clientId GROUP BY fl.produitID ORDER BY SUM(fl.quantity) DESC")
     List<Object[]> findProduitQuantitesByClientId(@Param("clientId") Long clientId);
-}
+
+    @Query("SELECT fl.facture.clientID, SUM(fl.quantity) as quantite FROM FactureLigne fl WHERE fl.produitID = :produitId GROUP BY fl.facture.clientID ORDER BY quantite DESC")
+    List<Object[]> findClientsByProduitId(@Param("produitId") Long produitId);
+    }

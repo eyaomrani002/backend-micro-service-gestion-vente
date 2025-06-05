@@ -1,0 +1,23 @@
+// package org.ms.client_service.feign;
+import org.ms.client_service.model.Facture;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+@FeignClient(name = "FACTURE-SERVICE")
+public interface FactureServiceClient {
+    @GetMapping("/factures/client/{clientId}")
+    List<Facture> findFacturesByClientId(@PathVariable("clientId") Long clientId);
+
+    @GetMapping("/factures/client/{clientId}/total?annee={annee}")
+    Double getChiffreAffairesByClient(@PathVariable("clientId") Long clientId, @RequestParam("annee") Integer annee);
+
+    @GetMapping("/factures/client/{clientId}/reste-a-payer")
+    Double getResteAPayerByClient(@PathVariable("clientId") Long clientId);
+
+    @GetMapping("/factures/client/{clientId}?statut={statut}")
+    List<Facture> findFacturesByClientAndStatut(@PathVariable("clientId") Long clientId, @RequestParam("statut") String statut);
+}

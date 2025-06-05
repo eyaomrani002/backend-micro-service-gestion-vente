@@ -1,0 +1,168 @@
+package org.ms.reglement_service.web;
+
+import jakarta.validation.Valid;
+import org.ms.reglement_service.entities.Reglement;
+import org.ms.reglement_service.feign.FactureServiceClient;
+import org.ms.reglement_service.feign.DeviseServiceClient;
+import org.ms.reglement_service.model.Facture;
+import org.ms.reglement_service.model.Devise;
+import org.ms.reglement_service.repository.ReglementRepository;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import feign.FeignException;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@RefreshScope
+@RestController
+@RequestMapping("/reglements")
+public class ReglementRestController {
+    private final ReglementRepository reglementRepository;
+    private final FactureServiceClient factureServiceClient;
+    private final DeviseServiceClient deviseServiceClient;
+
+    public ReglementRestController(ReglementRepository reglementRepository,
+                                   FactureServiceClient factureServiceClient,
+                                   DeviseServiceClient deviseServiceClient) {
+        this.reglementRepository = reglementRepository;
+        this.factureServiceClient = factureServiceClient;
+        this.deviseServiceClient = deviseServiceClient;
+    }
+
+    @GetMapping
+    public Map<String, Object> getAllReglements(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        Page<Reglement> pageReglements = reglementRepository.findAll(PageRequest.of(page, size));
+        Map<String, Object> response = new HashMap<>();
+        response.put("reglements", pageReglements.getContent());
+        response.put("totalPages", pageReglements.getTotalPages());
+        response.put("totalElements", pageReglements.getTotalElements());
+        return response;
+    }
+
+    @GetMapping("/{id}")
+    public Reglement getReglement(@PathVariable Long id) {
+        return reglementRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reglement not found for ID: " + id));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Reglement createReglement(@Valid @RequestBody Reglement reglement) {
+        validateReglement(reglement);
+        Reglement savedReglement = reglementRepository.save(reglement);
+        updateFactureStatus(savedReglement.getFactureId());
+        return savedReglement;
+    }
+
+    @PutMapping("/{id}")
+    public Reglement updateReglement(@PathVariable Long id, @Valid @RequestBody Reglement reglement) {
+        if (!reglementRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reglement not found for ID: " + id);
+        }
+        reglement.setId(id);
+        validateReglement(reglement);
+        Reglement savedReglement = reglementRepository.save(reglement);
+        updateFactureStatus(savedReglement.getFactureId());
+        return savedReglement;
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteReglement(@PathVariable Long id) {
+        Reglement reglement = reglementRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reglement not found for ID: " + id));
+        reglementRepository.deleteById(id);
+        updateFactureStatus(reglement.getFactureId());
+    }
+
+    @GetMapping("/facture/{factureId}")
+    public List<Reglement> getReglementsByFacture(@PathVariable Long factureId) {
+        return reglementRepository.findByFactureId(factureId);
+    }
+
+    @GetMapping("/client/{clientId}")
+    public Map<String, Object> getReglementsByClient(
+            @PathVariable Long clientId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<Long> factureIds;
+        try {
+            factureIds = factureServiceClient.getFactureIdsByClient(clientId);
+        } catch (FeignException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Facture service unavailable: " + e.getMessage());
+        }
+        Page<Reglement> pageReglements = reglementRepository.findAll(PageRequest.of(page, size));
+        List<Reglement> clientReglements = pageReglements.getContent().stream()
+                .filter(r -> factureIds.contains(r.getFactureId()))
+                .collect(Collectors.toList());
+        Map<String, Object> response = new HashMap<>();
+        response.put("reglements", clientReglements);
+        response.put("totalPages", pageReglements.getTotalPages());
+        response.put("totalElements", pageReglements.getTotalElements());
+        return response;
+    }
+
+    // --- Validation et mise à jour du statut de la facture ---
+
+    private void validateReglement(Reglement reglement) {
+        if (reglement.getFactureId() == null || reglement.getMontant() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Facture ID and positive montant are required");
+        }
+        Facture facture;
+        try {
+            facture = factureServiceClient.findFactureById(reglement.getFactureId());
+        } catch (FeignException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Facture service unavailable: " + e.getMessage());
+        }
+        if (facture == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + reglement.getFactureId());
+        }
+        if (reglement.getDateReglement() == null) {
+            reglement.setDateReglement(new Date());
+        }
+        if (reglement.getStatut() == null || !List.of("COMPLET", "PARTIEL", "ANNULE").contains(reglement.getStatut())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or missing statut: must be COMPLET, PARTIEL, or ANNULE");
+        }
+        if (reglement.getModePaiement() == null) {
+            reglement.setModePaiement("MAD");
+        } else {
+            try {
+                Devise devise = deviseServiceClient.findDeviseByCode(reglement.getModePaiement());
+                if (devise == null || devise.getCode() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid currency in modePaiement: " + reglement.getModePaiement());
+                }
+            } catch (FeignException e) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Devise service unavailable: " + e.getMessage());
+            }
+        }
+        if (reglement.getReference() == null) {
+            reglement.setReference("PAY-" + System.currentTimeMillis());
+        }
+    }
+
+    private void updateFactureStatus(Long factureId) {
+        try {
+            Facture facture = factureServiceClient.findFactureById(factureId);
+            if (facture == null || facture.getTotal() == null) return;
+            List<Reglement> reglements = reglementRepository.findByFactureId(factureId);
+            double totalPaid = reglements.stream()
+                    .filter(r -> !"ANNULE".equals(r.getStatut()))
+                    .mapToDouble(Reglement::getMontant)
+                    .sum();
+            String newStatus = "NON_PAYEE";
+            if (totalPaid == 0) newStatus = "NON_PAYEE";
+            else if (totalPaid < facture.getTotal()) newStatus = "PARTIELLEMENT_PAYEE";
+            else if (totalPaid >= facture.getTotal()) newStatus = "PAYEE";
+            factureServiceClient.updateFactureStatus(factureId, newStatus);
+        } catch (Exception e) {
+            // Log ou gestion d'erreur
+        }
+    }
+}

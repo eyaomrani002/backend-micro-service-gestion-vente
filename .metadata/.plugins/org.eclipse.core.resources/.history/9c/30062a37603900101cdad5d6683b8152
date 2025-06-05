@@ -1,0 +1,33 @@
+package org.ms.facture_service.repository;
+
+import org.ms.facture_service.entities.FactureLigne;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import org.springframework.data.rest.core.annotation.RestResource;
+
+import java.util.Collection;
+import java.util.List;
+
+@RepositoryRestResource
+public interface FactureLigneRepository extends JpaRepository<FactureLigne, Long> {
+    Collection<FactureLigne> findByFactureId(Long factureId);
+
+    @RestResource(path = "fullFactureLigne")
+    interface FullFactureLigne {
+        Long getId();
+        Long getProduitID();
+        long getQuantity();
+        double getPrice();
+    }
+
+    @Query("SELECT fl.produitID, SUM(fl.quantity) as quantite FROM FactureLigne fl WHERE fl.facture.clientID = :clientId GROUP BY fl.produitID ORDER BY SUM(fl.quantity) DESC")
+    List<Object[]> findProduitQuantitesByClientId(@Param("clientId") Long clientId);
+
+    @Query("SELECT fl.produitID, SUM(fl.quantity) as quantite FROM FactureLigne fl WHERE (:annee IS NULL OR YEAR(fl.facture.dateFacture) = :annee) GROUP BY fl.produitID ORDER BY SUM(fl.quantity) DESC")
+    List<Object[]> findProduitQuantitesByYear(@Param("annee") Integer annee);
+
+    @Query("SELECT SUM(fl.quantity) FROM FactureLigne fl WHERE fl.produitID = :produitId AND (:annee IS NULL OR YEAR(fl.facture.dateFacture) = :annee)")
+    Long findTotalQuantityByProduitId(@Param("produitId") Long produitId, @Param("annee") Integer annee);
+}

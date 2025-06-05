@@ -1,0 +1,247 @@
+package org.ms.produit_service.web;
+
+import org.ms.produit_service.entities.Produit;
+import org.ms.produit_service.repository.ProduitRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.IanaLinkRelations;
+import org.springframework.hateoas.PagedModel;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.Valid;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
+
+@RefreshScope
+@RestController
+@RequestMapping("/produits")
+public class ProduitRestController {
+    
+    private final ProduitRepository produitRepository;
+    private final PagedResourcesAssembler<Produit> pagedResourcesAssembler;
+    private final RestTemplate restTemplate;
+
+    @Value("${app.config.global-param:0}")
+    private int globalParam;
+    
+    @Value("${app.config.mon-param:0}")
+    private int monParam;
+    
+    @Value("${app.config.email:default@example.com}")
+    private String email;
+
+    @Autowired
+    public ProduitRestController(ProduitRepository produitRepository, 
+                               PagedResourcesAssembler<Produit> pagedResourcesAssembler,
+                               RestTemplate restTemplate) {
+        this.produitRepository = produitRepository;
+        this.pagedResourcesAssembler = pagedResourcesAssembler;
+        this.restTemplate = restTemplate;
+    }
+
+    // Lister tous les produits avec pagination, tri et HATEOAS
+    @GetMapping
+    public ResponseEntity<PagedModel<EntityModel<Produit>>> getAllProduits(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name,asc") String[] sort) {
+        
+        try {
+            Sort.Direction direction = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort[0]));
+            
+            Page<Produit> produitsPage = produitRepository.findAll(pageable);
+            
+            PagedModel<EntityModel<Produit>> pagedModel = pagedResourcesAssembler.toModel(
+                produitsPage,
+                produit -> EntityModel.of(produit,
+                    linkTo(methodOn(ProduitRestController.class).getProduitById(produit.getId())).withSelfRel(),
+                    linkTo(methodOn(ProduitRestController.class).getAllProduits(page, size, sort)).withRel(IanaLinkRelations.COLLECTION)
+                )
+            );
+            
+            return ResponseEntity.ok(pagedModel);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid sort parameter: " + sort[0], e);
+        }
+    }
+
+    // Récupérer un produit par ID avec HATEOAS
+    @GetMapping("/{id}")
+    public ResponseEntity<EntityModel<Produit>> getProduitById(@PathVariable Long id) {
+        Produit produit = produitRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, 
+                        "Produit non trouvé avec l'ID: " + id));
+        
+        EntityModel<Produit> resource = EntityModel.of(produit,
+            linkTo(methodOn(ProduitRestController.class).getProduitById(id)).withSelfRel(),
+            linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")
+        );
+        
+        return ResponseEntity.ok(resource);
+    }
+
+    // Ajouter un nouveau produit avec validation
+    @PostMapping
+    public ResponseEntity<EntityModel<Produit>> createProduit(@Valid @RequestBody Produit produit) {
+        Produit savedProduit = produitRepository.save(produit);
+        
+        EntityModel<Produit> resource = EntityModel.of(savedProduit,
+            linkTo(methodOn(ProduitRestController.class).getProduitById(savedProduit.getId())).withSelfRel(),
+            linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")
+        );
+        
+        return ResponseEntity
+                .created(linkTo(methodOn(ProduitRestController.class).getProduitById(savedProduit.getId())).toUri())
+                .body(resource);
+    }
+
+    // Modifier un produit existant
+    @PutMapping("/{id}")
+    public ResponseEntity<EntityModel<Produit>> updateProduit(
+            @PathVariable Long id, 
+            @Valid @RequestBody Produit produitDetails) {
+        
+        Produit updatedProduit = produitRepository.findById(id)
+                .map(produit -> {
+                    produit.setName(produitDetails.getName());
+                    produit.setPrice(produitDetails.getPrice());
+                    produit.setQuantity(produitDetails.getQuantity());
+                    return produitRepository.save(produit);
+                })
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, 
+                        "Produit non trouvé avec l'ID: " + id));
+        
+        EntityModel<Produit> resource = EntityModel.of(updatedProduit,
+            linkTo(methodOn(ProduitRestController.class).getProduitById(id)).withSelfRel(),
+            linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")
+        );
+        
+        return ResponseEntity.ok(resource);
+    }
+
+    // Supprimer un produit
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduit(@PathVariable Long id) {
+        Produit produit = produitRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, 
+                        "Produit non trouvé avec l'ID: " + id));
+        
+        try {
+            produitRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR, 
+                    "Erreur lors de la suppression du produit avec l'ID: " + id + ". Vérifiez les contraintes de la base de données.", 
+                    e);
+        }
+    }
+
+    // Produits en rupture de stock
+    @GetMapping("/rupture-stock")
+    public ResponseEntity<List<EntityModel<Produit>>> getProduitsEnRupture() {
+        List<Produit> produits = produitRepository.findByQuantity(0);
+        List<EntityModel<Produit>> resources = produits.stream()
+                .map(produit -> EntityModel.of(produit,
+                        linkTo(methodOn(ProduitRestController.class).getProduitById(produit.getId())).withSelfRel(),
+                        linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(resources);
+    }
+
+    // Produits avec faible stock
+    @GetMapping("/faible-stock")
+    public ResponseEntity<List<EntityModel<Produit>>> getProduitsFaibleStock(
+            @RequestParam(defaultValue = "5") int seuil) {
+        List<Produit> produits = produitRepository.findByQuantityLessThan(seuil);
+        List<EntityModel<Produit>> resources = produits.stream()
+                .map(produit -> EntityModel.of(produit,
+                        linkTo(methodOn(ProduitRestController.class).getProduitById(produit.getId())).withSelfRel(),
+                        linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(resources);
+    }
+
+    // Recherche de produits par nom
+    @GetMapping("/recherche")
+    public ResponseEntity<List<EntityModel<Produit>>> rechercherProduitsParNom(
+            @RequestParam String nom) {
+        List<Produit> produits = produitRepository.findByNameContainingIgnoreCase(nom);
+        List<EntityModel<Produit>> resources = produits.stream()
+                .map(produit -> EntityModel.of(produit,
+                        linkTo(methodOn(ProduitRestController.class).getProduitById(produit.getId())).withSelfRel(),
+                        linkTo(methodOn(ProduitRestController.class).getAllProduits(0, 10, new String[]{"name,asc"})).withRel("produits")))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(resources);
+    }
+
+    // Top produits les plus vendus (globalement ou par année)
+    @GetMapping("/top")
+    public ResponseEntity<List<Map<String, Object>>> getTopSellingProducts(
+            @RequestParam(required = false) Integer year) {
+        String url = year == null
+                ? "http://facture-service/api/invoice-items/top-products"
+                : "http://facture-service/api/invoice-items/top-products?year=" + year;
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> topProducts = restTemplate.getForObject(url, List.class);
+            return ResponseEntity.ok(topProducts);
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE, 
+                    "Erreur lors de la récupération des produits les plus vendus depuis facture-service", 
+                    e);
+        }
+    }
+
+    // Statistiques sur les produits
+    @GetMapping("/statistiques")
+    public ResponseEntity<Map<String, Object>> obtenirStatistiquesProduits() {
+        Map<String, Object> stats = new HashMap<>();
+        try {
+            stats.put("totalProduits", produitRepository.count());
+            stats.put("totalStock", produitRepository.sumQuantities());
+            stats.put("valeurStockTotal", produitRepository.calculateTotalStockValue());
+            stats.put("produitPlusCher", produitRepository.findTopByOrderByPriceDesc().orElse(null));
+            stats.put("produitMoinsCher", produitRepository.findTopByOrderByPriceAsc().orElse(null));
+            stats.put("moyennePrix", produitRepository.calculateAveragePrice());
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR, 
+                    "Erreur lors du calcul des statistiques des produits", 
+                    e);
+        }
+    }
+
+    // Configuration de l'application
+    @GetMapping("/configuration")
+    public ResponseEntity<Map<String, Object>> obtenirConfiguration() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("globalParam", globalParam);
+        config.put("monParam", monParam);
+        config.put("email", email);
+        config.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(config);
+    }
+}

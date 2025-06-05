@@ -1,0 +1,19 @@
+package org.ms.facture_service.repository;
+
+import org.ms.facture_service.entities.Facture;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.rest.webmvc.RepositoryRestController;
+
+import feign.Param;
+
+import java.util.List;
+
+@RepositoryRestController
+public interface FactureRepository extends JpaRepository<Facture, Long> {
+    List<Facture> findByClientId(Long clientId);
+    //écupérer le chiffre d’affaires total d’un client.
+    @Query("SELECT SUM(f.montantTotal) FROM Facture f WHERE f.client.id = :clientId")
+    Double calculateTotalRevenueByClient(@Param("clientId") Long clientId);
+
+}

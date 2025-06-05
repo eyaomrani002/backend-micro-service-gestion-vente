@@ -1,0 +1,5 @@
+package org.ms.produit_service.feign;
+
+public interface FactureServiceClient {
+
+}

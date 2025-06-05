@@ -1,0 +1,50 @@
+package org.ms.facture_service.feign;
+
+import org.ms.facture_service.model.Produit;
+import org.springframework.cloud.openfeign.FallbackFactory;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.hateoas.PagedModel;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.Collections;
+
+@FeignClient(name="PRODUIT-SERVICE")
+public interface ProduitServiceClient {
+    @GetMapping("/produits")
+    PagedModel<Produit> getAllProduits(@RequestParam("page") int page, @RequestParam("size") int size);
+
+    @GetMapping("/produits/{id}")
+    Produit getProduitById(@PathVariable("id") Long id);
+    
+    
+    @PutMapping("/produits/{id}/decreaseStock")
+    void decreaseStock(@PathVariable("id") Long id, @RequestParam("quantity") int quantity);
+}
+
+@Component
+class ProduitServiceClientFallbackFactory implements FallbackFactory<ProduitServiceClient> {
+    @Override
+    public ProduitServiceClient create(Throwable cause) {
+        return new ProduitServiceClient() {
+            @Override
+            public Produit getProduitById(Long id) {
+                System.err.println("Fallback triggered for getProduitById with id " + id + ": " + cause.getMessage());
+                // Retourner un produit par défaut ou null selon le besoin
+                Produit produit = new Produit();
+                produit.setId(id);
+                produit.setName("Produit inconnu (fallback)");
+                return produit;
+            }
+
+            @Override
+            public void decreaseStock(Long id, int quantity) {
+                System.err.println("Fallback triggered for decreaseStock with id " + id + ", quantity " + quantity + ": " + cause.getMessage());
+                // Ne rien faire pour éviter des incohérences, mais loguer l'erreur
+            }
+        };
+    }
+}

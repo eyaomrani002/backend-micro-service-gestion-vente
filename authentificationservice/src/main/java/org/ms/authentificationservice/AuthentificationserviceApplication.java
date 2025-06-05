@@ -28,8 +28,11 @@ public class AuthentificationserviceApplication {
         return args -> {
             AppUser user1 = new AppUser(null, "user1", "123", new ArrayList<>());
             AppUser user2 = new AppUser(null, "user2", "456", new ArrayList<>());
+            AppUser aya = new AppUser(null, "aya", "aya123", new ArrayList<>());
+
             userService.addUser(user1);
             userService.addUser(user2);
+            userService.addUser(aya);
 
             AppRole roleUser = new AppRole(null, "USER");
             AppRole roleAdmin = new AppRole(null, "ADMIN");
@@ -39,6 +42,7 @@ public class AuthentificationserviceApplication {
             userService.addRoleToUser("user1", "USER");
             userService.addRoleToUser("user2", "USER");
             userService.addRoleToUser("user2", "ADMIN");
+            userService.addRoleToUser("aya", "ADMIN");
 
             for (AppUser appUser : userService.getAllUsers()) {
                 System.out.println("User:" + appUser);

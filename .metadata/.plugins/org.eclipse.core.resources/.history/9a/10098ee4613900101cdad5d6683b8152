@@ -1,0 +1,68 @@
+package org.ms.facture_service.entities;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.ms.facture_service.model.Client;
+import jakarta.persistence.*;
+import org.springframework.data.rest.core.annotation.RestResource;
+
+import java.util.Collection;
+import java.util.Date;
+
+@Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Facture {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date dateFacture;
+
+    private String status;
+    private Double total;
+    private Double resteAPayer;
+
+ // Ajouter l'annotation @RestResource pour la relation factureLignes
+    @OneToMany(mappedBy = "facture", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @RestResource(path = "factureLignes", rel = "factureLignes")
+    private Collection<FactureLigne> factureLignes;
+    
+    @Transient
+    private Client client;
+
+    @Column(name = "client_id")
+    private Long clientID;
+
+    public Facture(Date dateFacture, String status, Long clientID) {
+        this.dateFacture = dateFacture;
+        this.status = status;
+        this.clientID = clientID;
+        this.total = 0.0;
+        this.resteAPayer = 0.0;
+    }
+
+    @PrePersist
+    @PreUpdate
+    public void computeTotal() {
+        if (factureLignes != null) {
+            this.total = factureLignes.stream()
+                    .mapToDouble(fl -> fl.getPrice() * fl.getQuantity())
+                    .sum();
+            if (this.resteAPayer == null || "NON_PAYEE".equals(this.status)) {
+                this.resteAPayer = this.total;
+            }
+        } else {
+            this.total = 0.0;
+            if (this.resteAPayer == null) {
+                this.resteAPayer = 0.0;
+            }
+        }
+        if (this.status == null) {
+            this.status = "NON_PAYEE";
+        }
+    }
+}

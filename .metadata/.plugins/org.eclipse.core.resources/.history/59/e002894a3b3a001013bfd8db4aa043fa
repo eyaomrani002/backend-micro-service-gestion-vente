@@ -1,0 +1,173 @@
+package org.ms.facture_service.web;
+
+import org.ms.facture_service.entities.Facture;
+import org.ms.facture_service.entities.FactureLigne;
+import org.ms.facture_service.repository.FactureRepository;
+import org.ms.facture_service.repository.FactureLigneRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/factures")
+public class FactureRestController {
+	private final FactureRepository factureRepository;
+	private final FactureLigneRepository factureLigneRepository;
+
+	public FactureRestController(FactureRepository factureRepository, FactureLigneRepository factureLigneRepository) {
+		this.factureRepository = factureRepository;
+		this.factureLigneRepository = factureLigneRepository;
+	}
+
+	// --- CRUD ---
+
+	@PostMapping
+	public ResponseEntity<Facture> createFacture(@RequestBody Facture facture) {
+		Facture savedFacture = factureRepository.save(facture);
+		return new ResponseEntity<>(savedFacture, HttpStatus.CREATED);
+	}
+
+	@GetMapping("/{id}")
+	public ResponseEntity<Facture> getFactureById(@PathVariable Long id) {
+		Optional<Facture> factureOpt = factureRepository.findById(id);
+		return factureOpt.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+	}
+
+	@PutMapping("/{id}")
+	public ResponseEntity<Facture> updateFacture(@PathVariable Long id, @RequestBody Facture facture) {
+		if (!factureRepository.existsById(id)) {
+			return ResponseEntity.notFound().build();
+		}
+		facture.setId(id);
+		Facture updatedFacture = factureRepository.save(facture);
+		return ResponseEntity.ok(updatedFacture);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> deleteFacture(@PathVariable Long id) {
+		if (!factureRepository.existsById(id)) {
+			return ResponseEntity.notFound().build();
+		}
+		factureRepository.deleteById(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping
+	public List<Facture> getAllFactures() {
+		return factureRepository.findAll();
+	}
+
+	// --- Client-Service Endpoints ---
+
+	@GetMapping("/client/{clientId}")
+	public List<Facture> findFacturesByClient(@PathVariable Long clientId,
+			@RequestParam(required = false) String statut) {
+		List<Facture> factures = factureRepository.findByClientID(clientId);
+		if (statut != null) {
+			factures = factures.stream().filter(f -> statut.equals(f.getStatus())).collect(Collectors.toList());
+		}
+		return factures;
+	}
+
+	@GetMapping("/client/{clientId}/total")
+	public Double getChiffreAffairesByClient(@PathVariable Long clientId,
+			@RequestParam(required = false) Integer annee) {
+		return factureRepository.findByClientID(clientId).stream().filter(
+				f -> annee == null || (f.getDateFacture() != null && (f.getDateFacture().getYear() + 1900) == annee))
+				.mapToDouble(Facture::getTotal).sum();
+	}
+
+	@GetMapping("/client/{clientId}/reste-a-payer")
+	public Double getResteAPayerByClient(@PathVariable Long clientId) {
+		return factureRepository.findByClientID(clientId).stream().filter(f -> !"PAYEE".equals(f.getStatus()))
+				.mapToDouble(Facture::getResteAPayer).sum();
+	}
+
+	@GetMapping("/lignes/client/{clientId}/produits")
+	public List<Map<String, Object>> getProduitsSollicitesByClient(@PathVariable Long clientId,
+			@RequestParam(defaultValue = "5") int limit) {
+		List<Object[]> results = factureLigneRepository.findProduitQuantitesByClientId(clientId);
+		return results.stream().map(row -> {
+			Map<String, Object> map = new HashMap<>();
+			map.put("produitId", row[0]);
+			map.put("quantite", ((Number) row[1]).longValue());
+			return map;
+		}).limit(limit).collect(Collectors.toList());
+	}
+
+	// --- Produit-Service Endpoint ---
+
+	@GetMapping("/lignes/produit/{produitId}/quantite")
+	public Long getQuantiteVendueByProduit(@PathVariable Long produitId,
+			@RequestParam(required = false) Integer annee) {
+		List<FactureLigne> lignes = factureLigneRepository.findAll().stream()
+				.filter(l -> l.getProduitID().equals(produitId))
+				.filter(l -> annee == null || (l.getFacture().getDateFacture() != null
+						&& (l.getFacture().getDateFacture().getYear() + 1900) == annee))
+				.collect(Collectors.toList());
+		return lignes.stream().mapToLong(FactureLigne::getQuantity).sum();
+	}
+
+	// --- Statistical Endpoints ---
+
+	@GetMapping("/stats/chiffre-affaires/{clientId}")
+	public Double getChiffreAffaires(@PathVariable Long clientId, @RequestParam(required = false) Integer annee) {
+		return factureRepository.findByClientID(clientId).stream().filter(
+				f -> annee == null || (f.getDateFacture() != null && (f.getDateFacture().getYear() + 1900) == annee))
+				.mapToDouble(Facture::getTotal).sum();
+	}
+
+	@GetMapping("/stats/reste-a-payer/{clientId}")
+	public Double getResteAPayer(@PathVariable Long clientId) {
+		return factureRepository.findByClientID(clientId).stream().filter(f -> !"PAYEE".equals(f.getStatus()))
+				.mapToDouble(Facture::getResteAPayer).sum();
+	}
+
+	@GetMapping("/stats/reglees/{clientId}")
+	public List<Facture> getFacturesReglees(@PathVariable Long clientId) {
+		return factureRepository.findByClientID(clientId).stream().filter(f -> "PAYEE".equals(f.getStatus()))
+				.collect(Collectors.toList());
+	}
+
+	@GetMapping("/stats/non-reglees/{clientId}")
+	public List<Facture> getFacturesNonReglees(@PathVariable Long clientId) {
+		return factureRepository.findByClientID(clientId).stream().filter(f -> !"PAYEE".equals(f.getStatus()))
+				.collect(Collectors.toList());
+	}
+
+	@GetMapping("/stats/produits-top/{clientId}")
+	public List<Map<String, Object>> getProduitsTopParClient(@PathVariable Long clientId,
+			@RequestParam(defaultValue = "5") int limit) {
+		List<Object[]> results = factureLigneRepository.findProduitQuantitesByClientId(clientId);
+		return results.stream().map(row -> {
+			Map<String, Object> map = new HashMap<>();
+			map.put("produitId", row[0]);
+			map.put("quantite", ((Number) row[1]).longValue());
+			return map;
+		}).limit(limit).collect(Collectors.toList());
+	}
+
+	@GetMapping("/stats/clients-fideles")
+	public List<Map<String, Object>> getClientsFideles(@RequestParam(defaultValue = "5") int limit) {
+		Map<Long, Double> caParClient = factureRepository.findAll().stream()
+				.collect(Collectors.groupingBy(Facture::getClientID, Collectors.summingDouble(Facture::getTotal)));
+		return caParClient.entrySet().stream().sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+				.limit(limit).map(entry -> {
+					Map<String, Object> map = new HashMap<>();
+					map.put("clientId", entry.getKey());
+					map.put("chiffreAffaires", entry.getValue());
+					return map;
+				}).collect(Collectors.toList());
+	}
+
+	@GetMapping("/full-facture/{id}")
+	public Facture getFullFacture(@PathVariable Long id) {
+		return factureRepository.findById(id).orElseThrow(
+				() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + id));
+	}
+
+}

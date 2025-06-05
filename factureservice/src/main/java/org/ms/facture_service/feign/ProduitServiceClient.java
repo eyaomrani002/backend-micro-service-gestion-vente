@@ -7,6 +7,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,12 +20,15 @@ import java.util.Collections;
 @FeignClient(name="PRODUIT-SERVICE", configuration = FeignClientConfig.class)
 public interface ProduitServiceClient {
     @GetMapping("/produits")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     PagedModel<Produit> getAllProduits(@RequestParam("page") int page, @RequestParam("size") int size);
 
     @GetMapping("/produits/{id}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     Produit getProduitById(@PathVariable("id") Long id);
 
     @PutMapping("/produits/{id}/decreaseStock")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Produit> decreaseStock(@PathVariable Long id, @RequestParam int quantity);
 }
 

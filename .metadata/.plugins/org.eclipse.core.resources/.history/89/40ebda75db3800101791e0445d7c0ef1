@@ -1,0 +1,42 @@
+package org.ms.client_service.web;
+
+import org.ms.client_service.entities.Client;
+import org.ms.client_service.repository.ClientRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RefreshScope
+@RestController
+@RequestMapping("/clients")
+public class ClientRestController {
+	@Autowired
+	private ClientRepository clientRepository;
+
+	@GetMapping
+	public List<Client> list() {
+		return clientRepository.findAll();
+	}
+
+	@GetMapping(path = "/{id}")
+	public Client getOne(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    return clientRepository.findById(id).get();
+	}
+
+	@PostMapping
+	public Client save(@RequestBody Client client) {
+		return clientRepository.save(client);
+	}
+
+    @PutMapping(path = "/{id}")
+    public Client update(@PathVariable("id") Long id, @RequestBody Client client) { // <-- ("id")
+        client.setId(id);
+        return clientRepository.save(client);
+    }
+
+	@DeleteMapping(path = "/{id}")
+	public void delete(@PathVariable("id") Long id) { // Ajoutez ("id") ici
+	    clientRepository.deleteById(id);
+	}
+}

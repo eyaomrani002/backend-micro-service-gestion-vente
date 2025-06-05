@@ -36,24 +36,19 @@ public class FactureServiceApplication {
                             RepositoryRestConfiguration restConfiguration) {
         return args -> {
             restConfiguration.exposeIdsFor(Facture.class, FactureLigne.class);
+            // ATTENTION : Ne pas appeler de méthode sécurisée par @PreAuthorize ici !
+            // Pour l'initialisation, créer un client et des produits factices localement si besoin.
+            // Exemple sans appel Feign sécurisé :
             if (factureRepository.count() > 0) return;
-            Client client = clientServiceClient.findClientById(1L);
-            if (client == null) client = new Client(1L, "Client Test", "test@mail.com", "Adresse");
+            Client client = new Client(1L, "Client Test", "test@mail.com", "Adresse");
             Facture facture = new Facture(new Date(), "NON_PAYEE", client.getId());
             facture.setClient(client);
             facture = factureRepository.save(facture);
 
-            var produits = produitServiceClient.getAllProduits(0, 10);
-            if (produits != null && produits.getContent() != null) {
-                for (Produit p : produits.getContent()) {
-                    FactureLigne ligne = new FactureLigne();
-                    ligne.setProduitID(p.getId());
-                    ligne.setPrice(p.getPrice());
-                    ligne.setQuantity(1 + new Random().nextInt(5));
-                    ligne.setFacture(facture);
-                    factureLigneRepository.save(ligne);
-                }
-            }
+            // Crée des produits factices si besoin, ou désactive cette partie si dépendance à produit-service
+            // var produits = ... (optionnel)
+            // if (produits != null) { ... }
+
             facture = factureRepository.findById(facture.getId()).orElse(facture);
             factureRepository.save(facture);
         };

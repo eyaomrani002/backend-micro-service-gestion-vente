@@ -19,6 +19,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RefreshScope
 //@CrossOrigin(origins = "http://localhost:4200")
@@ -39,6 +40,7 @@ public class ReglementRestController {
 	}
 
 	@GetMapping
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Map<String, Object> getAllReglements(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "5") int size, @RequestParam(required = false) String statut,
 			@RequestParam(required = false) String modePaiement) {
@@ -56,6 +58,7 @@ public class ReglementRestController {
 	// Récupérer un règlement par son ID
 
 	@GetMapping("/{id}")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Map<String, Object> getReglement(@PathVariable Long id) {
 		Reglement reglement = reglementRepository.findById(id).orElseThrow(
 				() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reglement not found for ID: " + id));
@@ -66,6 +69,7 @@ public class ReglementRestController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
+	@PreAuthorize("hasAuthority('ADMIN')")
 	public Reglement createReglement(@Valid @RequestBody Reglement reglement) {
 		validateReglement(reglement);
 		Reglement saved = reglementRepository.save(reglement);
@@ -75,6 +79,7 @@ public class ReglementRestController {
 
 	// Mettre à jour un règlement existant
 	@PutMapping("/{id}")
+	@PreAuthorize("hasAuthority('ADMIN')")
 	public Reglement updateReglement(@PathVariable Long id, @Valid @RequestBody Reglement reglement) {
 		Reglement existing = reglementRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Règlement non trouvé"));
@@ -95,6 +100,7 @@ public class ReglementRestController {
 
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@PreAuthorize("hasAuthority('ADMIN')")
 	public void deleteReglement(@PathVariable Long id) {
 		Reglement reglement = reglementRepository.findById(id)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Règlement non trouvé"));
@@ -104,11 +110,13 @@ public class ReglementRestController {
 
 	// Récupérer les règlements d’une facture
 	@GetMapping("/facture/{factureId}")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public List<Reglement> getReglementsByFacture(@PathVariable Long factureId) {
 		return reglementRepository.findByFactureId(factureId);
 	}
 
 	@GetMapping("/client/{clientId}")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Map<String, Object> getReglementsByClient(@PathVariable Long clientId,
 			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "5") int size,
 			@RequestParam(required = false) String statut, @RequestParam(required = false) String modePaiement) {
@@ -272,6 +280,7 @@ public class ReglementRestController {
 	}
 
 	@GetMapping("/facture/{factureId}/sum")
+	@PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
 	public Double sumByFactureId(@PathVariable Long factureId) {
 		return reglementRepository.findByFactureId(factureId).stream().filter(r -> !"ANNULE".equals(r.getStatut()))
 				.mapToDouble(Reglement::getMontant).sum();

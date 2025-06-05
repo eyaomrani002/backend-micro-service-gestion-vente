@@ -1,0 +1,25 @@
+package org.ms.reglement_service.feign;
+
+import org.ms.reglement_service.model.Facture;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@FeignClient(name = "facture-service", url = "http://localhost:8083")
+public interface FactureServiceClient {
+    @GetMapping("/factures/full-facture/{id}")
+    Facture findFactureById(@PathVariable("id") Long id);
+
+    @PutMapping("/factures/{id}/status")
+    void updateFactureStatus(@PathVariable("id") Long id, @RequestParam("status") String status);
+
+    @GetMapping("/factures/client/{clientId}/ids")
+    List<Long> getFactureIdsByClient(@PathVariable("clientId") Long clientId);
+
+    @GetMapping("/factures/{id}/total")
+    Double getFactureTotal(@PathVariable("id") Long id);
+
+    @PutMapping("/factures/{id}/montant-paye")
+    void updateFactureMontantPaye(@PathVariable("id") Long id, @RequestParam("montantPaye") Double montantPaye);
+}

@@ -1,0 +1,144 @@
+package org.ms.facture_service;
+
+import org.ms.facture_service.entities.*;
+import org.ms.facture_service.feign.*;
+import org.ms.facture_service.model.*;
+import org.ms.facture_service.repository.*;
+import org.springframework.boot.*;
+import org.springframework.boot.autoconfigure.*;
+import org.springframework.cloud.client.discovery.*;
+import org.springframework.cloud.openfeign.*;
+import org.springframework.context.annotation.*;
+import org.springframework.data.rest.core.config.*;
+import org.springframework.data.rest.webmvc.config.*;
+import org.springframework.hateoas.*;
+import org.springframework.http.*;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+
+import java.util.*;
+import java.util.logging.*;
+
+@SpringBootApplication
+@EnableFeignClients
+@EnableDiscoveryClient
+public class FactureServiceApplication {
+
+    private static final Logger LOGGER = Logger.getLogger(FactureServiceApplication.class.getName());
+
+    public static void main(String[] args) {
+        SpringApplication.run(FactureServiceApplication.class, args);
+    }
+
+    @Bean
+    public RepositoryRestConfigurer repositoryRestConfigurer() {
+        return new RepositoryRestConfigurer() {
+            @Override
+            public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config, CorsRegistry cors) {
+                config.exposeIdsFor(Facture.class, FactureLigne.class);
+                config.setBasePath("/api");
+                config.setDefaultMediaType(MediaType.APPLICATION_JSON);
+                config.useHalAsDefaultJsonMediaType(true);
+                
+                // Configure exposure
+                config.getExposureConfiguration()
+                    .forDomainType(Facture.class)
+                    .withItemExposure((metadata, httpMethods) -> 
+                        httpMethods.disable(HttpMethod.PATCH, HttpMethod.PUT, HttpMethod.DELETE))
+                    .withCollectionExposure((metadata, httpMethods) -> 
+                        httpMethods.disable(HttpMethod.PATCH, HttpMethod.PUT, HttpMethod.DELETE));
+            }
+        };
+    }
+
+    @Bean
+    CommandLineRunner initData(FactureRepository factureRepository,
+                              FactureLigneRepository factureLigneRepository,
+                              ClientServiceClient clientServiceClient,
+                              ProduitServiceClient produitServiceClient) {
+        
+        return args -> {
+            LOGGER.info("Vérification des données existantes...");
+            if (factureRepository.count() > 0) {
+                LOGGER.info("Des données existent déjà, arrêt de l'initialisation.");
+                return;
+            }
+
+            LOGGER.info("Initialisation des données de test...");
+            
+            // Récupération ou création du client
+            Client client = fetchOrCreateClient(clientServiceClient);
+            
+            // Récupération des produits
+            PagedModel<Produit> produits = fetchProduits(produitServiceClient);
+            
+            if (produits == null || produits.getContent().isEmpty()) {
+                LOGGER.warning("Aucun produit trouvé, arrêt de l'initialisation.");
+                return;
+            }
+
+            // Création de la facture
+            Facture facture = createFactureWithLignes(
+                factureRepository, 
+                factureLigneRepository, 
+                client, 
+                produits.getContent());
+            
+            LOGGER.info(String.format(
+                "Initialisation terminée. Facture #%d créée avec %d lignes. Total: %.2f",
+                facture.getId(),
+                facture.getFactureLignes().size(),
+                facture.getTotal()));
+        };
+    }
+
+    private Client fetchOrCreateClient(ClientServiceClient clientService) {
+        try {
+            Client client = clientService.findClientById(1L);
+            if (client != null) {
+                LOGGER.info("Client trouvé: " + client.getName());
+                return client;
+            }
+        } catch (Exception e) {
+            LOGGER.warning("Erreur lors de la récupération du client: " + e.getMessage());
+        }
+        
+        LOGGER.info("Création d'un client par défaut");
+        return new Client(1L, "Client par défaut", "default@client.com", "Adresse par défaut");
+    }
+
+    private PagedModel<Produit> fetchProduits(ProduitServiceClient produitService) {
+        try {
+            return produitService.getAllProduits(0, 100);
+        } catch (Exception e) {
+            LOGGER.warning("Erreur lors de la récupération des produits: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private Facture createFactureWithLignes(FactureRepository factureRepo,
+                                          FactureLigneRepository ligneRepo,
+                                          Client client,
+                                          Collection<Produit> produits) {
+        
+        Facture facture = new Facture();
+        facture.setDateFacture(new Date());
+        facture.setStatus("NON_PAYEE");
+        facture.setClientID(client.getId());
+        facture.setClient(client);
+        
+        facture = factureRepo.save(facture);
+        
+        Random random = new Random();
+        for (Produit p : produits) {
+            FactureLigne ligne = new FactureLigne();
+            ligne.setProduitID(p.getId());
+            ligne.setPrice(p.getPrice());
+            ligne.setQuantity(1 + random.nextInt(10)); // Quantité aléatoire entre 1 et 10
+            ligne.setFacture(facture);
+            ligneRepo.save(ligne);
+        }
+        
+        // Recharger la facture pour calculer le total
+        return factureRepo.findById(facture.getId()).orElse(facture);
+    }
+}

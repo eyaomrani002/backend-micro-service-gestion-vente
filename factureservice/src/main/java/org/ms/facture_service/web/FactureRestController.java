@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -71,6 +72,7 @@ public class FactureRestController {
     // --- CRUD ---
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
     @Transactional
     public ResponseEntity<Facture> createFacture(@Valid @RequestBody Facture facture) {
         // Validate client
@@ -123,6 +125,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public ResponseEntity<Facture> getFactureById(@PathVariable Long id) {
         Optional<Facture> factureOpt = factureRepository.findById(id);
         return factureOpt.map(facture -> ResponseEntity.ok(enrichFacture(facture)))
@@ -130,6 +133,7 @@ public class FactureRestController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Facture> updateFacture(@PathVariable Long id, @RequestBody Facture facture) {
         if (!factureRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -145,6 +149,7 @@ public class FactureRestController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> deleteFacture(@PathVariable Long id) {
         if (!factureRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -154,6 +159,7 @@ public class FactureRestController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> getAllFactures(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "10") int size) {
         Page<Facture> facturePage = factureRepository.findAll(PageRequest.of(page, size));
@@ -165,6 +171,7 @@ public class FactureRestController {
     // --- Client-Service Endpoints ---
 
     @GetMapping("/client/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> findFacturesByClient(@PathVariable Long clientId,
                                              @RequestParam(required = false) String statut) {
         List<Facture> factures = factureRepository.findByClientID(clientId);
@@ -175,6 +182,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/client/{clientId}/ids")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Long> getFactureIdsByClient(@PathVariable Long clientId) {
         return factureRepository.findByClientID(clientId).stream()
                 .map(Facture::getId)
@@ -182,6 +190,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/client/{clientId}/total")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Double getChiffreAffairesByClient(@PathVariable Long clientId,
                                              @RequestParam(required = false) Integer annee) {
         return factureRepository.findByClientID(clientId).stream().filter(
@@ -190,12 +199,14 @@ public class FactureRestController {
     }
 
     @GetMapping("/client/{clientId}/reste-a-payer")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Double getResteAPayerByClient(@PathVariable Long clientId) {
         return factureRepository.findByClientID(clientId).stream().filter(f -> !"PAYEE".equals(f.getStatus()))
                 .mapToDouble(Facture::getResteAPayer).sum();
     }
 
     @GetMapping("/lignes/client/{clientId}/produits")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Map<String, Object>> getProduitsSollicitesByClient(@PathVariable Long clientId,
                                                                    @RequestParam(defaultValue = "5") int limit) {
         List<Object[]> results = factureLigneRepository.findProduitQuantitesByClientId(clientId);
@@ -216,6 +227,7 @@ public class FactureRestController {
     // --- Produit-Service Endpoint ---
 
     @GetMapping("/lignes/produit/{produitId}/quantite")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Long getQuantiteVendueByProduit(@PathVariable Long produitId,
                                            @RequestParam(required = false) Integer annee) {
         List<FactureLigne> lignes = factureLigneRepository.findAll().stream()
@@ -229,6 +241,7 @@ public class FactureRestController {
     // --- Statistical Endpoints ---
 
     @GetMapping("/stats/chiffre-affaires/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Double getChiffreAffaires(@PathVariable Long clientId,
                                      @RequestParam(required = false) Integer annee) {
         return factureRepository.findByClientID(clientId).stream().filter(
@@ -237,12 +250,14 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/reste-a-payer/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Double getResteAPayer(@PathVariable Long clientId) {
         return factureRepository.findByClientID(clientId).stream().filter(f -> !"PAYEE".equals(f.getStatus()))
                 .mapToDouble(Facture::getResteAPayer).sum();
     }
 
     @GetMapping("/stats/reglees/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> getFacturesReglees(@PathVariable Long clientId) {
         return factureRepository.findByClientID(clientId).stream()
                 .filter(f -> "PAYEE".equals(f.getStatus()))
@@ -251,6 +266,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/non-reglees/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> getFacturesNonReglees(@PathVariable Long clientId) {
         return factureRepository.findByClientID(clientId).stream()
                 .filter(f -> !"PAYEE".equals(f.getStatus()))
@@ -259,6 +275,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/non-reglees")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> getAllFacturesNonReglees() {
         return factureRepository.findAll().stream()
                 .filter(f -> !"PAYEE".equals(f.getStatus()))
@@ -267,6 +284,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/reglees")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Facture> getAllFacturesReglees() {
         return factureRepository.findAll().stream()
                 .filter(f -> "PAYEE".equals(f.getStatus()))
@@ -275,6 +293,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/produits-top/{clientId}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Map<String, Object>> getProduitsTopParClient(@PathVariable Long clientId,
                                                              @RequestParam(defaultValue = "5") int limit) {
         List<Object[]> results = factureLigneRepository.findProduitQuantitesByClientId(clientId);
@@ -293,6 +312,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/stats/clients-fideles")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Map<String, Object>> getClientsFideles(
             @RequestParam(defaultValue = "5") int limit,
             @RequestParam(required = false) Integer annee) {
@@ -321,6 +341,7 @@ public class FactureRestController {
                 }).collect(Collectors.toList());
     }
     @GetMapping("/full-facture/{id}")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Facture getFullFacture(@PathVariable Long id) {
         Facture facture = factureRepository.findById(id).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + id));
@@ -330,6 +351,7 @@ public class FactureRestController {
     // --- Reglement-Service Endpoints ---
 
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> updateFactureStatus(@PathVariable Long id, @RequestParam String status) {
         Facture facture = factureRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + id));
@@ -339,6 +361,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/{id}/total")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Double getFactureTotal(@PathVariable Long id) {
         Facture facture = factureRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + id));
@@ -346,6 +369,7 @@ public class FactureRestController {
     }
 
     @PutMapping("/{id}/montant-paye")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> updateFactureMontantPaye(@PathVariable Long id, @RequestParam Double montantPaye) {
         Facture facture = factureRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Facture not found for ID: " + id));
@@ -357,6 +381,7 @@ public class FactureRestController {
     // --- Dashboard Endpoints ---
 
     @GetMapping("/sales/summary")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Map<String, Object> getSalesSummary() {
         List<Facture> factures = factureRepository.findAll();
         Map<String, Object> summary = new HashMap<>();
@@ -371,6 +396,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/invoices/summary")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Map<String, Object> getInvoiceSummary() {
         List<Facture> factures = factureRepository.findAll();
         Map<String, Object> summary = new HashMap<>();
@@ -381,6 +407,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/invoices")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Map<String, Object>> getInvoices() {
         return factureRepository.findAll().stream().map(facture -> {
             Map<String, Object> invoice = new HashMap<>();
@@ -400,6 +427,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/sales/trends")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public List<Map<String, Object>> getSalesTrends() {
         return factureRepository.findAll().stream()
                 .filter(f -> f.getDateFacture() != null)
@@ -427,6 +455,7 @@ public class FactureRestController {
     }
 
     @GetMapping("/invoices/payment-rate")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Map<String, Object> getPaymentRate() {
         List<Facture> factures = factureRepository.findAll();
         long totalInvoices = factures.size();
@@ -439,6 +468,7 @@ public class FactureRestController {
     
  // --- Produit le plus vendu (Dashboard) ---
     @GetMapping("/stats/produit-top")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Map<String, Object> getProduitLePlusVendu(@RequestParam(defaultValue = "1") int limit) {
         List<FactureLigne> lignes = factureLigneRepository.findAll();
         // Regrouper par produitId et sommer les quantités
@@ -472,6 +502,7 @@ public class FactureRestController {
         return result;
     }
     @GetMapping("/stats/factures-count")
+    @PreAuthorize("hasAuthority('USER') or hasAuthority('ADMIN')")
     public Map<String, Object> getFacturesStats() {
         List<Facture> factures = factureRepository.findAll();
         int total = factures.size();
@@ -482,5 +513,26 @@ public class FactureRestController {
         stats.put("reglees", reglees);
         stats.put("nonReglees", nonReglees);
         return stats;
+    }
+    @GetMapping("/lignes/produit/{produitId}/clients")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER')")
+    public List<Map<String, Object>> getClientsCommandantProduit(@PathVariable Long produitId) {
+        List<Object[]> results = factureLigneRepository.findClientsByProduitId(produitId);
+        List<Map<String, Object>> clients = new ArrayList<>();
+        for (Object[] row : results) {
+            Map<String, Object> map = new HashMap<>();
+            Long clientId = (Long) row[0];
+            Long quantite = ((Number) row[1]).longValue();
+            map.put("quantite", quantite);
+            try {
+                // Appel au microservice client pour récupérer le nom
+                Client client = clientServiceClient.findClientById(clientId);
+                map.put("clientName", client.getName());
+            } catch (Exception e) {
+                map.put("clientName", "Client inconnu");
+            }
+            clients.add(map);
+        }
+        return clients;
     }
 }

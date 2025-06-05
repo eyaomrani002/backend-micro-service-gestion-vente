@@ -1,0 +1,14 @@
+package org.ms.facture_service.repository;
+
+import org.ms.facture_service.entities.FactureLigne;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import java.util.List;
+
+@RepositoryRestResource
+public interface FactureLigneRepository extends JpaRepository<FactureLigne, Long> {
+    @Query("SELECT fl.produitID, SUM(fl.quantity) as quantite FROM FactureLigne fl WHERE fl.facture.clientID = :clientId GROUP BY fl.produitID ORDER BY SUM(fl.quantity) DESC")
+    List<Object[]> findProduitQuantitesByClientId(@Param("clientId") Long clientId);
+}

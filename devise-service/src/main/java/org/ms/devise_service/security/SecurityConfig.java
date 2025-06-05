@@ -8,8 +8,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-//...existing imports...
-import org.springframework.http.HttpMethod; // <-- à ajouter
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -20,17 +19,18 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 	    http
-	        .cors() // active le CORS
-	        .and()  // <-- ajoute .and() pour chaîner
-	        .csrf().disable() // désactive CSRF
+	        .csrf(csrf -> csrf.disable())
 	        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 	        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 	        .authorizeHttpRequests(auth -> auth
 	            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-	            .requestMatchers("/devises").permitAll() // <-- ajoute cette ligne
-	            .requestMatchers("/devises/{id}").permitAll()
-	            .requestMatchers("/devises/**").authenticated()
-	            .anyRequest().permitAll()
+	            .requestMatchers("/h2-console/**").permitAll()
+	            .requestMatchers("/api/auth/**").permitAll()
+	            .requestMatchers(HttpMethod.GET, "/devises/**").permitAll()
+	            .requestMatchers(HttpMethod.POST, "/devises/**").permitAll()
+	            .requestMatchers(HttpMethod.PUT, "/devises/**").permitAll()
+	            .requestMatchers(HttpMethod.DELETE, "/devises/**").permitAll()
+	            .anyRequest().authenticated()
 	        )
 	        .addFilterBefore(new JwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 	    return http.build();

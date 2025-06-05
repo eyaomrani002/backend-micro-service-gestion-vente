@@ -1,0 +1,28 @@
+package org.ms.facture_service.repository;
+
+import org.ms.facture_service.entities.Facture;
+import org.ms.facture_service.entities.FactureLigne;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import org.springframework.data.rest.core.annotation.RestResource;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Collection;
+
+//Remplacer @RepositoryRestResource par :
+@RepositoryRestResource
+public interface FactureRepository extends JpaRepository<Facture, Long> {
+ List<Facture> findByClientId(Long clientId);
+
+ @RestResource(path = "fullFacture")
+ interface FullFacture {
+     Long getId();
+     Date getDateFacture();
+     String getStatus();
+     Double getTotal();
+     Double getResteAPayer();
+     Collection<FactureLigne> getFactureLignes();
+     Long getClientID();
+ }
+}

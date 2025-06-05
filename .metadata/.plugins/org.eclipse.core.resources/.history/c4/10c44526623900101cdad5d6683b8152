@@ -1,0 +1,83 @@
+package org.ms.facture_service;
+
+import org.ms.facture_service.entities.Facture;
+import org.ms.facture_service.entities.FactureLigne;
+import org.ms.facture_service.feign.ClientServiceClient;
+import org.ms.facture_service.feign.ProduitServiceClient;
+import org.ms.facture_service.model.Client;
+import org.ms.facture_service.model.Produit;
+import org.ms.facture_service.repository.FactureLigneRepository;
+import org.ms.facture_service.repository.FactureRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.rest.core.config.RepositoryRestConfiguration;
+import org.springframework.hateoas.PagedModel;
+
+import java.util.Date;
+import java.util.Random;
+import java.util.logging.Logger;
+
+@SpringBootApplication
+@EnableFeignClients
+@EnableDiscoveryClient
+public class FactureServiceApplication {
+    private static final Logger LOGGER = Logger.getLogger(FactureServiceApplication.class.getName());
+
+    public static void main(String[] args) {
+        SpringApplication.run(FactureServiceApplication.class, args);
+    }
+
+    @Bean
+    CommandLineRunner start(FactureRepository factureRepository, FactureLigneRepository factureLigneRepository,
+                            ClientServiceClient clientServiceClient, ProduitServiceClient produitServiceClient,
+                            RepositoryRestConfiguration restConfiguration) {
+        return args -> {
+            restConfiguration.exposeIdsFor(Facture.class, FactureLigne.class);
+            try {
+                Client client;
+                try {
+                    client = clientServiceClient.findClientById(1L);
+                    if (client == null) {
+                        LOGGER.warning("Client with ID 1 not found. Using fallback client.");
+                        client = new Client(1L, "Fallback Client", "fallback@example.com");
+                    }
+                } catch (Exception e) {
+                    LOGGER.warning("CLIENT-SERVICE unavailable: " + e.getMessage() + ". Using fallback client.");
+                    client = new Client(1L, "Fallback Client", "fallback@example.com");
+                }
+                Facture facture = new Facture(new Date(), "NON_PAYEE", client.getId());
+                facture.setClient(client);
+                facture = factureRepository.save(facture);
+
+                PagedModel<Produit> listeProduits;
+                try {
+                    listeProduits = produitServiceClient.getAllProduits(0, 1000);
+                } catch (Exception e) {
+                    LOGGER.warning("PRODUIT-SERVICE unavailable: " + e.getMessage() + ". Skipping FactureLigne creation.");
+                    return;
+                }
+                if (listeProduits != null && listeProduits.getContent() != null && !listeProduits.getContent().isEmpty()) {
+                    for (Produit p : listeProduits.getContent()) {
+                        FactureLigne factureLigne = new FactureLigne();
+                        factureLigne.setProduitID(p.getId());
+                        factureLigne.setPrice(p.getPrice());
+                        factureLigne.setQuantity(1 + new Random().nextInt(100));
+                        factureLigne.setFacture(facture);
+                        factureLigneRepository.save(factureLigne);
+                    }
+                    facture = factureRepository.findById(facture.getId()).orElse(facture);
+                    factureRepository.save(facture); // Trigger computeTotal
+                    LOGGER.info("Inserted facture with ID: " + facture.getId() + ", Total: " + facture.getTotal());
+                } else {
+                    LOGGER.warning("No products found to create FactureLigne records.");
+                }
+            } catch (Exception e) {
+                LOGGER.severe("Failed to initialize facture data: " + e.getMessage());
+            }
+        };
+    }
+}
