@@ -1,0 +1,20 @@
+FROM eclipse-temurin:21-jre-alpine
+
+# Premièrement, mettre à jour les dépôts et installer curl
+RUN apk update && \
+    apk add --no-cache curl && \
+    addgroup -S spring && \
+    adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+WORKDIR /app
+COPY target/eureka-discoveryservice-*.jar app.jar
+
+USER spring
+EXPOSE 8761
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
+
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD curl -f http://localhost:8761/actuator/health || exit 1

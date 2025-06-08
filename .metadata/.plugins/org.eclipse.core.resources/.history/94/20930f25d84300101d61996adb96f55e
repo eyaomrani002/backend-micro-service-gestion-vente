@@ -1,0 +1,40 @@
+# Étape de construction
+FROM maven:3.8.6-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# Copie des fichiers de build en premier pour optimiser le cache
+COPY pom.xml .
+COPY src ./src
+
+# Téléchargement des dépendances et construction
+RUN mvn clean package -DskipTests
+
+# Étape d'exécution
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Installation des dépendances système
+RUN apk add --no-cache curl bash && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Copie de l'application depuis l'étape de construction
+COPY --from=build /app/target/authentificationservice-*.jar app.jar
+COPY --from=build /app/target/libs ./libs
+
+# Configuration de l'utilisateur non-root
+USER spring
+
+# Exposition du port
+EXPOSE 8089
+
+# Variables d'environnement
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV SPRING_PROFILES_ACTIVE=prod
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:8089/actuator/health || exit 1
+
+# Point d'entrée
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

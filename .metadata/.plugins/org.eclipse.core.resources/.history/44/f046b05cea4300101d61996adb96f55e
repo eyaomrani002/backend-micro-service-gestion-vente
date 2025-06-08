@@ -1,0 +1,29 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Copie du JAR
+COPY target/eureka-discoveryservice-*.jar app.jar
+
+# Installation des dépendances et configuration utilisateur
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Passage à l'utilisateur non-root
+USER spring
+EXPOSE 8761
+
+# Options JVM optimisées
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+# Configuration Eureka Server
+ENV EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false \
+    EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+    EUREKA_CLIENT_FETCH_REGISTRY=false
+
+# Healthcheck optimisé
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 \
+  CMD curl -sf http://localhost:8761/actuator/health || exit 1
+
+# Point d'entrée optimisé
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

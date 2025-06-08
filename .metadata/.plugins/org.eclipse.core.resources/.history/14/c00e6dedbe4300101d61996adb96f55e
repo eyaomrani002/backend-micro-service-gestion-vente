@@ -1,0 +1,34 @@
+# Utilisation d'une image JRE Alpine minimale
+FROM eclipse-temurin:17-jre-alpine
+
+# Définition du répertoire de travail
+WORKDIR /app
+
+# Copie du JAR (avec pattern générique)
+COPY target/eureka-discoveryservice-*.jar app.jar
+
+# Installation des dépendances et configuration utilisateur
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Passage à l'utilisateur non-root
+USER spring
+
+# Exposition du port Eureka
+EXPOSE 8761
+
+# Optimisation JVM pour conteneurs
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Configuration Eureka spécifique (variables par défaut)
+ENV EUREKA_CLIENT_REGISTER-WITH-EUREKA=false \
+    EUREKA_CLIENT_FETCH-REGISTRY=false \
+    SERVER_PORT=8761
+
+# Healthcheck amélioré pour Eureka
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD curl -f http://localhost:8761/actuator/health || exit 1
+
+# Point d'entrée optimisé avec exec
+ENTRYPOINT exec java $JAVA_OPTS -jar app.jar

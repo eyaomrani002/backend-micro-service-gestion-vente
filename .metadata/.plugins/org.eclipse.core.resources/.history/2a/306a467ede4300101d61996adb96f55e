@@ -1,0 +1,36 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Copie du JAR avec pattern générique
+COPY target/authentificationservice-*.jar app.jar
+
+# Installation de curl et configuration utilisateur
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Passage à l'utilisateur non-root
+USER spring
+
+# Exposition du port
+EXPOSE 8089
+
+# Optimisation JVM
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Variables d'environnement pour le service
+ENV SPRING_CONFIG_IMPORT=configserver:http://config-service:5555 \
+    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka \
+    SPRING_PROFILES_ACTIVE=prod \
+    SPRING_SECURITY_USER_NAME=admin \
+    SPRING_SECURITY_USER_PASSWORD=admin123 \
+    JWT_SECRET=your-strong-secret-key-here \
+    SPRING_DATASOURCE_URL=jdbc:h2:mem:authdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE \
+    SPRING_H2_CONSOLE_ENABLED=true
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+  CMD curl -f http://localhost:8089/actuator/health || exit 1
+
+# Point d'entrée
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

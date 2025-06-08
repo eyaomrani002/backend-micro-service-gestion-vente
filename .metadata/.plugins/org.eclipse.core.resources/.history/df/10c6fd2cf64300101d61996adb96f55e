@@ -1,0 +1,17 @@
+server:
+  port: 8089
+spring:
+  application:
+    name: auth-service
+  security:
+    user:
+      name: ${SPRING_SECURITY_USER_NAME}
+      password: ${SPRING_SECURITY_USER_PASSWORD}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+logging:
+  level:
+    org.springframework.security: DEBUG

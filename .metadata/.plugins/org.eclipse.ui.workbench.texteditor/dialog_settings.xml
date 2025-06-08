@@ -4,6 +4,9 @@
 	<section name="java.lang.Class">
 		<item key="replaceBarOpen" value="false"/>
 		<list key="findhistory">
+			<item value="client"/>
+			<item value="facture-service"/>
+			<item value="facture"/>
 			<item value="h2database"/>
 			<item value="eure"/>
 			<item value="Feign"/>
@@ -16,9 +19,6 @@
 			<item value="sum"/>
 			<item value="updateFactureStatus"/>
 			<item value="status"/>
-			<item value="validateReglement"/>
-			<item value="GetMapping"/>
-			<item value="actures/client/{clientId}"/>
 		</list>
 	</section>
 </section>

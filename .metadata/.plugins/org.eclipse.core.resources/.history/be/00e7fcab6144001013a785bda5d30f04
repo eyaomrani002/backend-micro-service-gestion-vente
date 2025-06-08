@@ -1,0 +1,71 @@
+server:
+  port: 8089
+spring:
+  application:
+    name: authentication-service
+  datasource:
+    url: jdbc:h2:mem:users-db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false  # Disable open-in-view to avoid warning
+  cloud:
+    config:
+      uri: http://config-service:5555  # Fix port
+      fail-fast: true
+      retry:
+        initial-interval: 1000
+        max-interval: 2000
+        max-attempts: 6
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+    enabled: true
+    fetchRegistry: true
+    registerWithEureka: true
+    healthcheck:
+      enabled: true
+    useDnsForFetchingServiceUrls: false
+    preferSameZoneEureka: false
+    registry-fetch-interval-seconds: 5
+    instance-info-replication-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 10
+  instance:
+    preferIpAddress: true
+    hostname: authentication-service
+    instanceId: ${spring.application.name}:${random.value}
+    leaseRenewalIntervalInSeconds: 5
+    leaseExpirationDurationInSeconds: 15
+    appname: authentication-service
+    virtualHostName: authentication-service
+    secureVirtualHostName: authentication-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  info:
+    enabled: true
+info:
+  app:
+    name: Authentication Service
+    email: ayaomrani@gmail.com
+logging:
+  level:
+    org.springframework.cloud: DEBUG
+    com.netflix.eureka: DEBUG
+    org.hibernate: INFO

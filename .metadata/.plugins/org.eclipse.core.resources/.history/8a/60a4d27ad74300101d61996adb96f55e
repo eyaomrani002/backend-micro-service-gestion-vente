@@ -1,0 +1,20 @@
+FROM eclipse-temurin:21-jre-alpine
+
+# Installer wget au lieu de curl
+RUN apk add --no-cache wget && \
+    addgroup -S spring && \
+    adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+WORKDIR /app
+COPY target/eureka-discoveryservice-*.jar app.jar
+
+USER spring
+EXPOSE 8761
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
+
+# Utiliser wget pour le healthcheck
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://localhost:8761/actuator/health || exit 1

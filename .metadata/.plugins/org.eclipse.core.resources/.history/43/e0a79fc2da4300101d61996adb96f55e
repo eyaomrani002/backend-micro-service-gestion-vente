@@ -1,0 +1,30 @@
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Copier le JAR (pattern générique pour authentificationservice)
+COPY target/authentificationservice-*.jar app.jar
+
+# Installer curl et créer un utilisateur non-root 'spring'
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Basculer à l'utilisateur non-root
+USER spring
+
+# Exposer le port 8089 (configuré dans ton application.properties)
+EXPOSE 8089
+
+# Variables d'environnement pour optimisation JVM en container
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# (Optionnel) variables d'environnement spécifiques à Spring Cloud Config ou autres
+# ENV SPRING_PROFILES_ACTIVE=prod
+
+# Healthcheck HTTP personnalisé
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:8089/actuator/health || exit 1
+
+# Lancement de l’application avec JAVA_OPTS
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

@@ -1,0 +1,39 @@
+# Utilisation de l'image officielle Temurin JRE 21 basée sur Alpine
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Ajout d'un volume pour stocker les logs
+VOLUME /app/logs
+
+# Copie du JAR généré par Maven
+COPY ../authentificationservice/target/auth-service-*.jar app.jar
+
+# Installation de curl et création d'un utilisateur non-root
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Exécution avec un utilisateur non-root
+USER spring
+
+# Exposition du port utilisé par le service d'authentification
+EXPOSE 8089
+
+# Options JVM optimisées pour conteneurisation
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Configuration Spring Boot et Eureka pour la découverte des services
+ENV SPRING_CONFIG_IMPORT="optional:configserver:http://config-service:5555" \
+    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka \
+    SPRING_PROFILES_ACTIVE=dev
+
+# Variables spécifiques à l'authentification JWT
+ENV JWT_SECRET="monSecretJWT" \
+    JWT_EXPIRATION=86400000
+
+# Vérification de l'état du micro-service via Actuator avec un timeout ajusté
+HEALTHCHECK --interval=30s --timeout=8s --retries=5 \
+  CMD curl -sf http://localhost:8089/actuator/health || exit 1
+
+# Point d'entrée optimisé pour exécuter l'application Java
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

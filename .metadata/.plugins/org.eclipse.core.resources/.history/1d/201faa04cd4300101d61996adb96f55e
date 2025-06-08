@@ -1,0 +1,9 @@
+spring.application.name=client-service
+spring.cloud.config.uri=http://localhost:5555/
+spring.cloud.discovery.enabled=true
+spring.cloud.config.retry.initial-interval=1000
+spring.cloud.config.retry.max-interval=2000
+spring.cloud.config.retry.max-attempts=5
+
+eureka.client.register-with-eureka=true
+eureka.client.fetch-registry=true

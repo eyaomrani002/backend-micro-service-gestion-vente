@@ -1,0 +1,31 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Copier le JAR généré par Maven (pattern générique)
+COPY target/client-service-*.jar app.jar
+
+# Installation de curl et création utilisateur non-root
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Exécution avec un utilisateur non-root
+USER spring
+
+# Exposition du port (selon config)
+EXPOSE 8081
+
+# Options JVM pour conteneur
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Variables environnement (correctes)
+ENV SPRING_CONFIG_IMPORT=configserver:http://config-service:5555 \
+    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka \
+    SPRING_PROFILES_ACTIVE=dev
+
+# Healthcheck du microservice via Actuator
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
+
+# Point d'entrée avec expansion des variables d'environnement
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

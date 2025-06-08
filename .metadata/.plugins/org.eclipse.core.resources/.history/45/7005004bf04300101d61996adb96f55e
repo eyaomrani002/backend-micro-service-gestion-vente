@@ -1,0 +1,26 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Installer wait-for-it pour les dépendances
+RUN apk add --no-cache curl bash && \
+    curl -o /wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh && \
+    chmod +x /wait-for-it.sh
+
+COPY target/factureservice-*.jar app.jar
+
+# Configuration utilisateur non-root
+RUN addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+USER spring
+EXPOSE 8083
+
+# Optimisation JVM
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Point d'entrée avec attente des dépendances
+ENTRYPOINT ["sh", "-c", "./wait-for-it.sh config-service:5555 --timeout=60 -- ./wait-for-it.sh eureka-server:8761 --timeout=60 -- exec java $JAVA_OPTS -jar app.jar"]
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:8083/actuator/health || exit 1

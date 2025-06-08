@@ -1,0 +1,33 @@
+# Utilisation d'une image JRE Alpine minimale
+FROM eclipse-temurin:17-jre-alpine
+
+# Définition du répertoire de travail
+WORKDIR /app
+
+# Copie du JAR (avec pattern générique)
+COPY target/config-service-*.jar app.jar
+
+# Installation des dépendances système et configuration utilisateur
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring && \
+    chown -R spring:spring /app
+
+# Passage à l'utilisateur non-root
+USER spring
+
+# Exposition du port
+EXPOSE 5555
+
+# Optimisation JVM pour conteneurs
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+# Configuration Spring Cloud Config spécifique
+ENV SPRING_PROFILES_ACTIVE=native \
+    SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=classpath:/config/,file:/config/
+
+# Healthcheck personnalisé pour Config Server
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:5555/actuator/health || exit 1
+
+# Point d'entrée optimisé
+ENTRYPOINT exec java $JAVA_OPTS -jar app.jar

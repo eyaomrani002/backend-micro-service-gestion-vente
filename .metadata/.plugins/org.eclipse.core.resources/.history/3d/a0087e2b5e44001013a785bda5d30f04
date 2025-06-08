@@ -1,0 +1,21 @@
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+    enabled: true
+    fetchRegistry: true
+    registerWithEureka: true
+    healthcheck:
+      enabled: true
+    # Configuration spécifique pour Docker
+    useDnsForFetchingServiceUrls: false
+    preferSameZoneEureka: false
+  instance:
+    preferIpAddress: false  # Désactivé pour Docker
+    hostname: authentification-service
+    instanceId: ${spring.application.name}:${spring.application.instance-id:${random.value}}
+    leaseRenewalIntervalInSeconds: 5
+    leaseExpirationDurationInSeconds: 15
+    appname: authentificationservice
+    virtualHostName: authentificationservice
+    secureVirtualHostName: authentificationservice
